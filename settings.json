@@ -1,0 +1,22 @@
+{
+  "KSearch": 10,
+  "leafSize": 0.05,
+  "MinSizeOfCluster": 20,
+  "NumberOfNeighbours": 30,
+  "SmoothnessThreshold": 2,
+  "CurvatureThreshold": 2,
+  "RANSAC_DistThreshold": 0.25,
+  "RANSAC_MinInliers": 0.5,
+  "RANSAC_PlaneVectorThreshold": 0.2,
+  "pointPitch": 20,
+  "minimumEdgeDist": 1,
+  "minHeightDiff": 0.5,
+  "minAngle_normalDiff": 5,
+
+  "roof_NumberOfNeighbours" : 10,
+  "roof_SmoothnessThreshold": 20,
+  "roof_CurvatureThreshold" : 2,
+  "roof_MinSizeOfCluster" : 15
+}
+
+
