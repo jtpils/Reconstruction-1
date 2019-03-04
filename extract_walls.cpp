@@ -214,7 +214,7 @@ simpleView("input original point clouds", re.pointCloud);
     detectHeightRange(re.pointCloud,heightHigh, heightLow);
 
 	convert2D(re.pointCloud,twoDimPts);
-simpleView("[convert2D ]", twoDimPts);
+simpleView("[convert2D]", twoDimPts);
 	cout << "[convert2D] points num " << twoDimPts->size() << endl;
 
     PointCloudT::Ptr largestComp(new PointCloudT);

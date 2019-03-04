@@ -62,4 +62,17 @@ if(UNIX AND NOT APPLE)
 
   add_executable(extractWall extract_walls.cpp)
   target_link_libraries (extractWall ${PROJECT_NAME})
+
+  # CGAL and its components
+  find_package( CGAL )
+
+  if ( CGAL_FOUND )
+    include( ${CGAL_USE_FILE} )
+  else()
+    message(STATUS "NOTICE: This program requires the CGAL library, and will not be compiled.")
+  endif()
+
+  add_executable(testCGAL testCGAL.cpp)
+  target_link_libraries(testCGAL ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES})
+
 endif()
