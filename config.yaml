@@ -1,0 +1,36 @@
+RANSAC:
+  RANSAC_DistThreshold : 0.25
+  RANSAC_MinInliers : 0.5
+  RANSAC_PlaneVectorThreshold : 0.2
+
+Downsampling:
+  KSearch: 10
+  leafSize: 0.05
+
+Clustering:
+  MinSizeOfCluster: 50
+  NumberOfNeighbours : 30
+  SmoothnessThreshold : 2
+  CurvatureThreshold : 5
+
+
+pointPitch : 20
+minPlaneHeight : 0.2
+
+Combine:
+  minimumEdgeDist : 1.0
+  minPlanesDist : 0.4
+  minAngle_normalDiff : 10.0
+
+SmoothNoise:
+  K : 50
+  beta : 3
+
+
+
+DensityFilter:
+  alpha2: 1.0
+  leafSize: 0.1
+
+  ExtractEdge:
+    alpha: 0.1
