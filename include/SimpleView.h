@@ -5,6 +5,7 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <Plane.h>
 #include <Reconstruction.h>
+#include <extract_walls.h>
 using namespace std;
 typedef pcl::PointXYZRGBNormal PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
@@ -16,4 +17,9 @@ void simpleView(const string &title, const pcl::PointCloud<pcl::PointXYZ>::Ptr &
 void simpleView(const string& title, vector<Plane> &planes);
 
 void simpleView(const string& title, Reconstruction &re);
+
+void simpleView(const string& title, vector<PointCloudT::Ptr> &clusters);
+
+void simpleView(const string& title, vector<EdgeLine> &lines);
+
 #endif

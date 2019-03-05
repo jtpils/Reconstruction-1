@@ -24,6 +24,7 @@
 #include <pcl/filters/conditional_removal.h>
 #include "Plane.h"
 using namespace std;
+using namespace pcl;
 
 struct reconstructParas
 {
@@ -79,8 +80,9 @@ void extractTopPts(PointCloudT::Ptr input, PointCloudT::Ptr output, float highes
 void convert2D(PointCloudT::Ptr input,PointCloudT::Ptr output);
 void findBiggestComponent2D(PointCloudT::Ptr input, PointCloudT::Ptr output);
 
-void extractEdges(PointCloudT::Ptr input, PointCloudT::Ptr output, float alpha);
+void computeHull(PointCloudT::Ptr input, PointCloudT::Ptr output, float alpha);
 void extractLineFromEdge(PointCloudT::Ptr input, vector<EdgeLine>& edgeLines);
+void extractLineFromEdge2(PointCloudT::Ptr input, vector<EdgeLine>& edgeLines);
 void seperatePtsToGroups(PointCloudT::Ptr input, float radius, vector<PointCloudT::Ptr>& output);
 void ptsToLine(PointCloudT::Ptr input, Eigen::VectorXf& paras, EdgeLine& output);
 void findLinkedLines(vector<EdgeLine>& edgeLines);
@@ -94,4 +96,8 @@ void regionGrow(PointCloudT::Ptr input, int NumberOfNeighbours, int SmoothnessTh
 void applyBeamExtraction(PointCloudT::Ptr input, float high, vector<EdgeLine>& edgeLines);
 
 void removePtsAroundLine(PointCloudT::Ptr input, PointCloudT::Ptr output, vector<EdgeLine>& lines, float dist);
+
+void regionGrow2D(PointCloudT::Ptr input, vector<PointCloudT::Ptr>& output);
+void calculateNormal2D(PointCloudT::Ptr input, PointCloud<Normal>::Ptr cloud_normals);
+
 #endif //TEST_PCL_EXTRACTWALL_H

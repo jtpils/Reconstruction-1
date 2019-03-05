@@ -26,11 +26,24 @@ SmoothNoise:
   K : 50
   beta : 3
 
+View:
+  original : true
+  smoothNoise : false
+  densityFilter : false
+  2D : false
+  BiggestComponent : false
+  hull : false
+  linkedEdges : true
 
 
 DensityFilter:
   alpha2: 1.0
   leafSize: 0.1
 
-  ExtractEdge:
-    alpha: 0.1
+ComputeHull:
+  alpha: 0.1
+
+
+RegionGrow2D:
+  serarchRadius : 0.3
+  normalTh : 5

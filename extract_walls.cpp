@@ -151,19 +151,19 @@ int main(int argc, char** argv) {
 		    cout << "Please choose test dataset " << " \n";
             cin >> index;
             if (index == 1) fileName = "/home/czh/Desktop/PointCloudDataset/LaserScanner/old/Room_A.ply";
-            else if (index == 2) fileName = "/home/czh/Desktop/PointCloudDataset/LaserScanner/old/Room_E_Cloud_binary.ply";
+            else if (index == 2) fileName = "/home/czh/Desktop/PointCloudDataset/LaserScanner/roomE_empty/roomE_empty.ply";
             else if (index == 3) fileName = "/home/czh/Desktop/PointCloudDataset/LaserScanner/cooridor/Downsampled_coorridor_all.ply";
         }
     #endif
     config = YAML::LoadFile(configPath);
 	Reconstruction re(fileName);
-	simpleView("input original point clouds", re.pointCloud);
+	if (Paras<bool>("View","original")) simpleView("input original point clouds", re.pointCloud);
 
 	smoothNoise(re.pointCloud, Paras<int>("SmoothNoise","K"), Paras<int>("SmoothNoise","beta"));
-    simpleView("[smooth Noise]", re.pointCloud);
+	if (Paras<bool>("View","smoothNoise")) simpleView("[smooth Noise]", re.pointCloud);
 
     densityFilter(re.pointCloud);
-	simpleView("[densityFilter]", re.pointCloud);
+	if (Paras<bool>("View","densityFilter")) simpleView("[densityFilter]", re.pointCloud);
 
 
 
@@ -228,54 +228,38 @@ int main(int argc, char** argv) {
     float heightLow,heightHigh;
     detectHeightRange(re.pointCloud,heightHigh, heightLow);
 
-
-
 	convert2D(re.pointCloud,twoDimPts);
-simpleView("[convert2D]", twoDimPts);
-	cout << "[convert2D] points num " << twoDimPts->size() << endl;
+	if (Paras<bool>("View","2D")) simpleView("[convert2D]", twoDimPts);
+
 
     PointCloudT::Ptr largestComp(new PointCloudT);
     findBiggestComponent2D(twoDimPts, largestComp);
-//simpleView("[findBiggestComponent2D]", largestComp);
+	if (Paras<bool>("View","BiggestComponent")) simpleView("[findBiggestComponent2D]", largestComp);
 
 
     PointCloudT::Ptr hullOutput(new PointCloudT);
-    extractEdges(largestComp, hullOutput, Paras<float>("ExtractEdge","alpha"));
+    computeHull(largestComp, hullOutput, Paras<float>("ComputeHull","alpha"));
 
-    cout << "Extract Hull: before " << largestComp->size() << " -> after " << largestComp->size() << "\n";
-simpleView("[compute hull] ", hullOutput);
 
-	vector<Eigen::Vector3i> colors;
-	for (int k = 0; k <= 10; ++k) {
-		colors.push_back(Eigen::Vector3i(255,0,0)); // red
-		colors.push_back(Eigen::Vector3i(255,255,0)); // yellow
-		colors.push_back(Eigen::Vector3i(0,0,255)); // blue
-		colors.push_back(Eigen::Vector3i(0,255,0)); // green
-		colors.push_back(Eigen::Vector3i(0,255,255)); // cyan
-		colors.push_back(Eigen::Vector3i(255,0,255)); // pink
-	}
+	if (Paras<bool>("View","hull")) simpleView("[compute hull] ", hullOutput);
+
     // extract lines from edge point clouds
     vector<EdgeLine> edgeLines;
     extractLineFromEdge(hullOutput, edgeLines);
-    cout << "extract " << edgeLines.size() << " lines\n";
+	simpleView("[extractLineFromEdge] " , edgeLines);
 
-	PointCloudT::Ptr linePts(new PointCloudT);
-	for (int i = 0; i < edgeLines.size(); ++i) {
-		int color = 255 <<24 | colors[i][0] << 16 | colors[i][1] << 8 | colors[i][2];
-		generateLinePointCloud(edgeLines[i].p, edgeLines[i].q, 20,color, linePts);
-	}
-	simpleView("line pts" , linePts);
+
+	// extract lines from edge point clouds
+	vector<EdgeLine> edgeLines2;
+	extractLineFromEdge2(hullOutput, edgeLines2);
+	simpleView("[extractLineFromEdge2] " , edgeLines2);
+
 
 	applyBeamExtraction(re.pointCloud, heightHigh, edgeLines);
 
 	findLinkedLines(edgeLines);
 	cout << "after find linked lines, extract " << edgeLines.size() << " lines\n";
-	linePts->erase(linePts->begin(),linePts->end());
-	for (int i = 0; i < edgeLines.size(); ++i) {
-		int color = 255 <<24 | colors[i][0] << 16 | colors[i][1] << 8 | colors[i][2];
-		generateLinePointCloud(edgeLines[i].p, edgeLines[i].q, 20,color, linePts);
-	}
-	simpleView("line pts after findLinkedLines" , linePts);
+	if (Paras<bool>("View","linkedEdges")) simpleView("line pts after findLinkedLines" , edgeLines);
 
     return 0;
 /*    PointT min, max;
@@ -803,7 +787,7 @@ void detectHeightRange(PointCloudT::Ptr input, float& high, float& low){
     // assert height difference is larger than 2 meters
     assert(abs(high-low) >= 2);
     if (high < low) swap(high, low);
-    cout << "Height Detection: [" << low << " " << high << "] max num "<< maxNum << "\n";
+    cout << "[detectHeightRange] [" << low << " " << high << "] max num "<< maxNum << "\n";
 }
 
 void extractTopPts(PointCloudT::Ptr input, PointCloudT::Ptr output, float highest, float dimension, reconstructParas paras){
@@ -827,9 +811,11 @@ void convert2D(PointCloudT::Ptr input,PointCloudT::Ptr output) {
     for(auto& p : output->points) {
         p.z = 0;
     }
+
+	cout << "[convert2D] points num " << output->size() << endl;
 }
 
-void extractEdges(PointCloudT::Ptr input, PointCloudT::Ptr output, float alpha){
+void computeHull(PointCloudT::Ptr input, PointCloudT::Ptr output, float alpha){
 	pcl::ConcaveHull<pcl::PointXYZ> concave_hull;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr tmpInput(new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::PointCloud<pcl::PointXYZ>::Ptr tmpOutput(new pcl::PointCloud<pcl::PointXYZ>);
@@ -852,6 +838,8 @@ void extractEdges(PointCloudT::Ptr input, PointCloudT::Ptr output, float alpha){
 		q.rgba = INT32_MAX;
 		output->push_back(q);
 	}
+
+	cout << "[computeHull]: before " << input->size() << " -> after " << output->size() << "\n";
 }
 
 void findBiggestComponent2D(PointCloudT::Ptr input, PointCloudT::Ptr output){
@@ -881,15 +869,13 @@ void findBiggestComponent2D(PointCloudT::Ptr input, PointCloudT::Ptr output){
 }
 
 void extractLineFromEdge(PointCloudT::Ptr input, vector<EdgeLine>& edgeLines){
-//	vector<PointCloudT::Ptr> clusters;
-//	regionGrow(input,30,10,5,5,20, clusters);
-
-//	cout << "extract " << clusters.size() << " lines\n";
+	PointCloudT::Ptr inputTemp(new PointCloudT);
+	copyPointCloud(*input, *inputTemp);
 	vector<PointCloudT::Ptr> roofEdgeClusters;
 	vector<Eigen::VectorXf> roofEdgeClustersCoffs;
-	assert(input->size() > 0);
+	assert(inputTemp->size() > 0);
 	int iter = 0;
-	while (iter++ < 1000 && input->size() > 1) {
+	while (iter++ < 1000 && inputTemp->size() > 1) {
 		pcl::ModelCoefficients::Ptr sacCoefficients(new pcl::ModelCoefficients);
 		pcl::PointIndices::Ptr sacInliers(new pcl::PointIndices);
 		pcl::SACSegmentation<PointT> seg;
@@ -897,7 +883,7 @@ void extractLineFromEdge(PointCloudT::Ptr input, vector<EdgeLine>& edgeLines){
 		seg.setModelType(pcl::SACMODEL_LINE);
 		seg.setMethodType(pcl::SAC_RANSAC);
 		seg.setDistanceThreshold(0.05);
-		seg.setInputCloud(input);
+		seg.setInputCloud(inputTemp);
 		seg.segment(*sacInliers, *sacCoefficients);
 		Eigen::VectorXf coff(6);
 		coff << sacCoefficients->values[0], sacCoefficients->values[1], sacCoefficients->values[2],
@@ -905,52 +891,68 @@ void extractLineFromEdge(PointCloudT::Ptr input, vector<EdgeLine>& edgeLines){
 
 		PointCloudT::Ptr extracted_cloud(new PointCloudT);
 		pcl::ExtractIndices<PointT> extract;
-		extract.setInputCloud(input);
+		extract.setInputCloud(inputTemp);
 		extract.setIndices(sacInliers);
 		extract.setNegative(false);
 		extract.filter(*extracted_cloud);
 
 		vector<PointCloudT::Ptr> tmpClusters;
-		seperatePtsToGroups(extracted_cloud, 0.5, tmpClusters);
+		seperatePtsToGroups(extracted_cloud, 0.5, tmpClusters); // use this method may make several parts as one part since RANSAC agrees
 		for (auto &c:tmpClusters) {
 			roofEdgeClusters.push_back(c);
 			roofEdgeClustersCoffs.push_back(coff);
 		}
 		extract.setNegative(true);
-		extract.filter(*input);
+		extract.filter(*inputTemp);
 	}
 
-	int sum = 0;
-	for (auto &c:roofEdgeClusters) sum += c->size();
-	vector<Eigen::Vector3i> colors;
-	for (int k = 0; k <= roofEdgeClusters.size()/6; ++k) {
-		colors.push_back(Eigen::Vector3i(255,0,0)); // red
-		colors.push_back(Eigen::Vector3i(255,255,0)); // yellow
-		colors.push_back(Eigen::Vector3i(0,0,255)); // blue
-		colors.push_back(Eigen::Vector3i(0,255,0)); // green
-		colors.push_back(Eigen::Vector3i(0,255,255)); // cyan
-		colors.push_back(Eigen::Vector3i(255,0,255)); // pink
-	}
-
-	PointCloudT::Ptr coloredClusterPts(new PointCloudT);
-	for (int l = 0; l < roofEdgeClusters.size(); ++l) {
-		int color = 255 <<24 | colors[l][0] << 16 | colors[l][1] << 8 | colors[l][2];
-		for (auto &p:roofEdgeClusters[l]->points) {
-			p.rgba = color;
-			coloredClusterPts->push_back(p);
-		}
-	}
+//	int sum = 0;
+//	for (auto &c:roofEdgeClusters) sum += c->size();
 
 	assert(roofEdgeClusters.size() > 0);
-	simpleView("coloredPts",coloredClusterPts);
+	//simpleView("[extractLineFromEdge] clusters",roofEdgeClusters);
 
 	for (int i = 0; i < roofEdgeClusters.size(); ++i) {
 		EdgeLine line;
 		ptsToLine(roofEdgeClusters[i], roofEdgeClustersCoffs[i], line);
 		if (pcl::geometry::distance(line.p,line.q) > 0.1) edgeLines.push_back(line);
-		//edgeLines.push_back(line);
 	}
 	cout << "[extractLineFromEdge] extract " << edgeLines.size() << " lines"<< endl;
+
+}
+
+void extractLineFromEdge2(PointCloudT::Ptr input, vector<EdgeLine>& edgeLines){
+	vector<PointCloudT::Ptr> reginGrow2DOutput;
+	vector<Eigen::VectorXf> roofEdgeClustersCoffs;
+	regionGrow2D(input, reginGrow2DOutput);
+
+	assert(reginGrow2DOutput.size() > 0);
+	simpleView("[extractLineFromEdge2] regionGrow2DOutput",reginGrow2DOutput);
+
+	// using new Generate Pts
+	for (auto &Pts : reginGrow2DOutput) {
+		pcl::ModelCoefficients::Ptr sacCoefficients(new pcl::ModelCoefficients);
+		pcl::PointIndices::Ptr sacInliers(new pcl::PointIndices);
+		pcl::SACSegmentation<PointT> seg;
+		seg.setOptimizeCoefficients(true);
+		seg.setModelType(pcl::SACMODEL_LINE);
+		seg.setMethodType(pcl::SAC_RANSAC);
+		seg.setDistanceThreshold(0.05);
+		seg.setInputCloud(Pts);
+		seg.segment(*sacInliers, *sacCoefficients);
+		Eigen::VectorXf coff(6);
+		coff << sacCoefficients->values[0], sacCoefficients->values[1], sacCoefficients->values[2],
+				sacCoefficients->values[3], sacCoefficients->values[4], sacCoefficients->values[5];
+		roofEdgeClustersCoffs.push_back(coff);
+	}
+
+	for (int i = 0; i < reginGrow2DOutput.size(); ++i) {
+		EdgeLine line;
+		ptsToLine(reginGrow2DOutput[i], roofEdgeClustersCoffs[i], line);
+		if (pcl::geometry::distance(line.p,line.q) > 0.1) edgeLines.push_back(line);
+	}
+
+	cout << "[extractLineFromEdge2] extract " << edgeLines.size() << " lines"<< endl;
 
 }
 
@@ -1235,5 +1237,81 @@ void removePtsAroundLine(PointCloudT::Ptr input, PointCloudT::Ptr output, vector
 	simpleView("[removePtsAroundLine] ",output);
 }
 
+void regionGrow2D(PointCloudT::Ptr input, vector<PointCloudT::Ptr>& output){
+    // calculate Normal
+    PointCloud<Normal>::Ptr cloud_normals(new PointCloud<Normal>);
+    calculateNormal2D(input, cloud_normals);
 
+    float radius = Paras<float>("RegionGrow2D","serarchRadius");
+    int normalTh = Paras<int>("RegionGrow2D","normalTh");
+    pcl::KdTreeFLANN<PointT> kdtree;
+    kdtree.setInputCloud(input);
+    unordered_set<int> found;
+    int k = 0;
+    while(found.size() < input->size()) {
+        vector<int> group;
+        stack<PointT> seeds;
+
+        while(found.count(k)) k++;
+        if (k >= input->size()) break;
+        seeds.push(input->points[k]);
+        found.insert(k);
+        group.push_back(k);
+        Eigen::Vector4f seedNormal = cloud_normals->points[k].getNormalVector4fMap();
+
+        while(!seeds.empty()) {
+            PointT seed = seeds.top();
+            seeds.pop();
+            vector<int> pointIdx;
+            vector<float> dist;
+            kdtree.radiusSearch(seed, radius, pointIdx,dist);
+            for(auto& ix : pointIdx) {
+                if (found.count(ix)) continue;
+                Eigen::Vector4f q = cloud_normals->points[ix].getNormalVector4fMap();
+                auto r = seedNormal.dot(q);
+                float angle_in_radiant = acos(r);
+                if (angle_in_radiant < M_PI/180*normalTh) {
+                    found.insert(ix);
+                    seeds.push(input->points[ix]);
+                    group.push_back(ix);
+                }
+            }
+        }
+        if (group.size() < 2) continue;
+        PointCloudT::Ptr foundPts(new PointCloudT);
+        for (auto& idx:group) {
+            foundPts->points.push_back(input->points[idx]);
+        }
+        output.push_back(foundPts);
+    }
+
+    cout << "[regionGrow2D] " << output.size() << " clusters are found" << endl;
+}
+
+void calculateNormal2D(PointCloudT::Ptr input, PointCloud<Normal>::Ptr cloud_normals){
+    KdTreeFLANN<PointT> kdtree;
+    kdtree.setInputCloud(input);
+    int K = 10;
+    for (auto &p:input->points) {
+        Eigen::Vector3f v; v << p.x, p.y, p.z ;
+        std::vector<int> pointIdxNKNSearch(K);
+        std::vector<float> pointNKNSquaredDistance(K);
+        Eigen::MatrixXf conv = Eigen::MatrixXf::Zero(3,3);
+        Normal normal; normal.normal_x = 0; normal.normal_y = 0; normal.normal_z = 0;
+        if ( kdtree.nearestKSearch (p, K, pointIdxNKNSearch, pointNKNSquaredDistance) > 0 )
+        {
+            for (int & idx: pointIdxNKNSearch) {
+                Eigen::Vector3f x_i;
+                x_i << input->points[idx].x, input->points[idx].y, input->points[idx].z;
+                conv = conv +  ( (v - x_i) * (v - x_i).transpose() );
+            }
+            Eigen::JacobiSVD<Eigen::MatrixXf> svd(conv,  Eigen::ComputeThinU | Eigen::ComputeThinV);
+            normal.normal_x = svd.matrixU()(1,0);
+            normal.normal_y = svd.matrixU()(1,1);
+            normal.normal_z = svd.matrixU()(1,2);
+            // cout << p.x << "," << p.y << "," << p.z << "," << svd.matrixU()(1,0) << ", " << svd.matrixU()(1,1) << ", " << svd.matrixU()(1,2) << ";\n";
+        }
+        cloud_normals->push_back(normal);
+    }
+}
 
