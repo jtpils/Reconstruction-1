@@ -35,9 +35,11 @@
 #include "Reconstruction.h"
 #include <pcl/surface/concave_hull.h>
 #include <pcl/surface/convex_hull.h>
+#include <yaml-cpp/yaml.h>
 
 #include <pcl/console/print.h>
 using namespace std;
+using namespace pcl;
 typedef pcl::PointXYZRGB PointRGB;
 typedef pcl::PointXYZRGBNormal PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
@@ -107,7 +109,24 @@ compute (pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_in,
     }
 }
 
+YAML::Node config ;
+
+template<typename T>
+T Paras(string a)
+{
+    return config[a].as<T>();
+}
+
+template<typename T>
+T Paras(string a, string b)
+{
+    YAML::Node aa = config[a];
+    return aa[b].as<T>();
+}
+
+
 int main(int argc, char** argv) {
+
 	PCL_WARN("This program is based on assumption that ceiling and ground on the X-Y  \n");
 	pcl::console::setVerbosityLevel(pcl::console::L_ALWAYS); // for not show the warning
 	PointCloudT::Ptr allCloudFilled(new PointCloudT);
@@ -115,103 +134,101 @@ int main(int argc, char** argv) {
 	vector<Plane> horizontalPlanes;
 	vector<Plane> upDownPlanes;
 	vector<Plane> wallEdgePlanes;
-	reconstructParas paras;
 	#ifdef _WIN32
 		//string fileName = argv[2];
 		string fileName = "TestData/Room_A.ply";
 	#elif defined __unix__
-		string fileName = "/home/czh/Desktop/pointCloud PartTime/test/Room_E_Cloud_binary.ply";
-		if(argv[1] != "") fileName = argv[1];
+		string fileName = "";
+		string configPath = "../config.yaml";
+		if (argc == 3) {
+		    fileName = argv[1];
+            configPath = argv[2];
+		}else{
+            cout << "1. RoomA \n";
+		    cout << "2. RoomE\n";
+            cout << "3. Hall\n";
+		    int index = 0;
+		    cout << "Please choose test dataset " << " \n";
+            cin >> index;
+            if (index == 1) fileName = "/home/czh/Desktop/PointCloudDataset/LaserScanner/old/Room_A.ply";
+            else if (index == 2) fileName = "/home/czh/Desktop/PointCloudDataset/LaserScanner/old/Room_E_Cloud_binary.ply";
+            else if (index == 3) fileName = "/home/czh/Desktop/PointCloudDataset/LaserScanner/cooridor/Downsampled_coorridor_all.ply";
+        }
     #endif
-	ifstream se(argv[2],ifstream::binary);
-	Json::Value settings;
-	se >> settings;
-	paras.KSearch = settings["KSearch"].asInt();
-    paras.leafSize = settings["leafSize"].asFloat(); // unit is meter -> 5cm
-    paras.MinSizeOfCluster = settings["MinSizeOfCluster"].asInt();
-    paras.NumberOfNeighbours = settings["NumberOfNeighbours"].asInt();
-    paras.SmoothnessThreshold = settings["SmoothnessThreshold"].asInt(); // angle 360 degree
-    paras.CurvatureThreshold = settings["CurvatureThreshold"].asInt();
-    paras.RANSAC_DistThreshold = settings["RANSAC_DistThreshold"].asFloat(); //0.25;
-    paras.RANSAC_MinInliers = settings["RANSAC_MinInliers"].asFloat(); // 500
-    paras.RANSAC_PlaneVectorThreshold = settings["RANSAC_PlaneVectorThreshold"].asFloat();
-    paras.pointPitch = settings["pointPitch"].asInt();
-    paras.minimumEdgeDist = settings["minimumEdgeDist"].asInt();
-    paras.minHeightDiff = settings["minHeightDiff"].asFloat();
-    paras.minAngle_normalDiff = settings["minAngle_normalDiff"].asInt();
-	paras.roof_NumberOfNeighbours = settings["roof_NumberOfNeighbours"].asInt();
-	paras.roof_SmoothnessThreshold = settings["roof_SmoothnessThreshold"].asInt();
-	paras.roof_CurvatureThreshold = settings["roof_CurvatureThreshold"].asInt();
-	paras.roof_MinSizeOfCluster = settings["roof_MinSizeOfCluster"].asInt();
-
-
+    config = YAML::LoadFile(configPath);
 	Reconstruction re(fileName);
-simpleView("input original point clouds", re.pointCloud);
-	smoothNoise(re.pointCloud, 50, 3);
-//simpleView("[smooth Noise]", re.pointCloud);
+	simpleView("input original point clouds", re.pointCloud);
+
+	smoothNoise(re.pointCloud, Paras<int>("SmoothNoise","K"), Paras<int>("SmoothNoise","beta"));
+    simpleView("[smooth Noise]", re.pointCloud);
+
+    densityFilter(re.pointCloud);
+	simpleView("[densityFilter]", re.pointCloud);
 
 
-	//re.downSampling(paras.leafSize);
-	//re.outputFile("TestData/Room_F.ply");
-	//pcl::io::savePCDFile("TestData/Room_A.pcd", *re.pointCloud);
-	//re.applyRegionGrow(paras.NumberOfNeighbours, paras.SmoothnessThreshold,
-		//paras.CurvatureThreshold, paras.MinSizeOfCluster, paras.KSearch);
-	//re.applyRANSACtoClusters(paras.RANSAC_DistThreshold, paras.RANSAC_PlaneVectorThreshold, paras.RANSAC_MinInliers);
-//	PointCloudT::Ptr all(new PointCloudT);
-//	vector<Plane>& planes = re.ransacPlanes;
-//	//simpleView("Raw RANSAC planes", planes);
-//	PointCloudT::Ptr tmp(new PointCloudT);
-//	for (auto &plane : planes) {
-//		for (auto &p : plane.pointCloud->points) {
-//			tmp->push_back(p);
-//		}
-//	}
-//	//pcl::io::savePLYFile("OutputData/Raw_RANSAC.ply", *tmp);
-//	for (auto &plane : planes) {
-//		if (plane.orientation == Horizontal) {
-//			horizontalPlanes.push_back(plane);
-//		}
-//		else if (plane.orientation == Vertical) {
-//			plane.filledPlane(paras.pointPitch);
-//			filledPlanes.push_back(plane);
-//		}
-//	}
-//	tmp->resize(0);
-//	for (auto &plane : planes) {
-//		for (auto &p : plane.pointCloud->points) {
-//			tmp->push_back(p);
-//		}
-//	}
-//	pcl::io::savePLYFile("OutputData/Filled_RANSAC.ply", *tmp);
-//	simpleView("Filled RANSAC planes", planes);
-//
-//	// choose the two that have larger points
-//	for (size_t j = 0; j < horizontalPlanes.size() < 2 ? horizontalPlanes.size() : 2; j++) {
-//		size_t maxNum = 0;
-//		size_t maxCloudIndex = 0;
-//		for (size_t i = 0; i < horizontalPlanes.size(); ++i) {
-//			if (maxNum < horizontalPlanes[i].pointCloud->size()) {
-//				maxCloudIndex = i;
-//				maxNum = horizontalPlanes[i].pointCloud->size();
-//			}
-//		}
-//		upDownPlanes.push_back(horizontalPlanes[maxCloudIndex]);
-//		horizontalPlanes.erase(horizontalPlanes.begin() + maxCloudIndex);
-//	}
-//	cout << "num of horizontal planes: " << horizontalPlanes.size() << endl;
-//	cout << "num of upDownPlanes planes: " << upDownPlanes.size() << endl;
-//
-//	Eigen::Vector2f ZLimits(-upDownPlanes[0].abcd()[3], -upDownPlanes[1].abcd()[3]);
-//	if (upDownPlanes[0].abcd()[3] < upDownPlanes[1].abcd()[3]) {
-//		ZLimits[0] = -upDownPlanes[1].abcd()[3];
-//		ZLimits[1] = -upDownPlanes[0].abcd()[3];
-//	}
-//
-	float step = 1 / (float)paras.pointPitch;
+
+/*	re.downSampling(paras.leafSize);
+	re.outputFile("TestData/Room_F.ply");
+	pcl::io::savePCDFile("TestData/Room_A.pcd", *re.pointCloud);
+	re.applyRegionGrow(paras.NumberOfNeighbours, paras.SmoothnessThreshold,
+		paras.CurvatureThreshold, paras.MinSizeOfCluster, paras.KSearch);
+	re.applyRANSACtoClusters(paras.RANSAC_DistThreshold, paras.RANSAC_PlaneVectorThreshold, paras.RANSAC_MinInliers);
+	PointCloudT::Ptr all(new PointCloudT);
+	vector<Plane>& planes = re.ransacPlanes;
+	//simpleView("Raw RANSAC planes", planes);
+	PointCloudT::Ptr tmp(new PointCloudT);
+	for (auto &plane : planes) {
+		for (auto &p : plane.pointCloud->points) {
+			tmp->push_back(p);
+		}
+	}
+	//pcl::io::savePLYFile("OutputData/Raw_RANSAC.ply", *tmp);
+	for (auto &plane : planes) {
+		if (plane.orientation == Horizontal) {
+			horizontalPlanes.push_back(plane);
+		}
+		else if (plane.orientation == Vertical) {
+			plane.filledPlane(paras.pointPitch);
+			filledPlanes.push_back(plane);
+		}
+	}
+	tmp->resize(0);
+	for (auto &plane : planes) {
+		for (auto &p : plane.pointCloud->points) {
+			tmp->push_back(p);
+		}
+	}
+	pcl::io::savePLYFile("OutputData/Filled_RANSAC.ply", *tmp);
+	simpleView("Filled RANSAC planes", planes);
+
+	// choose the two that have larger points
+	for (size_t j = 0; j < horizontalPlanes.size() < 2 ? horizontalPlanes.size() : 2; j++) {
+		size_t maxNum = 0;
+		size_t maxCloudIndex = 0;
+		for (size_t i = 0; i < horizontalPlanes.size(); ++i) {
+			if (maxNum < horizontalPlanes[i].pointCloud->size()) {
+				maxCloudIndex = i;
+				maxNum = horizontalPlanes[i].pointCloud->size();
+			}
+		}
+		upDownPlanes.push_back(horizontalPlanes[maxCloudIndex]);
+		horizontalPlanes.erase(horizontalPlanes.begin() + maxCloudIndex);
+	}
+	cout << "num of horizontal planes: " << horizontalPlanes.size() << endl;
+	cout << "num of upDownPlanes planes: " << upDownPlanes.size() << endl;
+
+	Eigen::Vector2f ZLimits(-upDownPlanes[0].abcd()[3], -upDownPlanes[1].abcd()[3]);
+	if (upDownPlanes[0].abcd()[3] < upDownPlanes[1].abcd()[3]) {
+		ZLimits[0] = -upDownPlanes[1].abcd()[3];
+		ZLimits[1] = -upDownPlanes[0].abcd()[3];
+	}*/
+	float step = 1 / Paras<int>("pointPitch");
 	PointCloudT::Ptr twoDimPts(new PointCloudT);
 
     float heightLow,heightHigh;
     detectHeightRange(re.pointCloud,heightHigh, heightLow);
+
+
 
 	convert2D(re.pointCloud,twoDimPts);
 simpleView("[convert2D]", twoDimPts);
@@ -223,7 +240,7 @@ simpleView("[convert2D]", twoDimPts);
 
 
     PointCloudT::Ptr hullOutput(new PointCloudT);
-    extractEdges(largestComp, hullOutput, 0.1);
+    extractEdges(largestComp, hullOutput, Paras<float>("ExtractEdge","alpha"));
 
     cout << "Extract Hull: before " << largestComp->size() << " -> after " << largestComp->size() << "\n";
 simpleView("[compute hull] ", hullOutput);
@@ -249,6 +266,8 @@ simpleView("[compute hull] ", hullOutput);
 	}
 	simpleView("line pts" , linePts);
 
+	applyBeamExtraction(re.pointCloud, heightHigh, edgeLines);
+
 	findLinkedLines(edgeLines);
 	cout << "after find linked lines, extract " << edgeLines.size() << " lines\n";
 	linePts->erase(linePts->begin(),linePts->end());
@@ -259,315 +278,315 @@ simpleView("[compute hull] ", hullOutput);
 	simpleView("line pts after findLinkedLines" , linePts);
 
     return 0;
-//    PointT min, max;
-//    pcl::getMinMax3D(*topTemp,min,max);
-//    simpleView("topTemp ", topTemp);
-//    PointCloudT::Ptr roofEdgePts(new PointCloudT);
-//    for (float i = min.x; i < max.x; i += step) { // NOLINT
-//        // extract x within [i,i+step] -> tempX
-//        PointCloudT::Ptr topTempX(new PointCloudT);
-//        pcl::PassThrough<PointT> filterX;
-//        filterX.setInputCloud(topTemp);
-//        filterX.setFilterFieldName("x");
-//        filterX.setFilterLimits(i, i + 0.1);
-//        filterX.filter(*topTempX);
-//        // found the minY and maxY
-//        PointT topTempY_min, topTempY_max;
-//        pcl::getMinMax3D(*topTempX, topTempY_min, topTempY_max);
-//        PointT p1, g1;
-//        p1.x = i; p1.y = topTempY_min.y; p1.z = 0;
-//        g1.x = i; g1.y = topTempY_max.y; g1.z = 0;
-//        g1.r = 255;
-//        p1.r = 255;
-//        if (abs(p1.y) < 10000 && abs(p1.z) < 10000 && abs(g1.y) < 10000 && abs(g1.z) < 10000) {
-//            roofEdgePts->push_back(p1);
-//            roofEdgePts->push_back(g1);
-//        }
-//    }
-//	for (float i = min.y; i < max.y; i += step) { // NOLINT
-//		// extract x within [i,i+step] -> tempX
-//		PointCloudT::Ptr topTempX(new PointCloudT);
-//		pcl::PassThrough<PointT> filterX;
-//		filterX.setInputCloud(topTemp);
-//		filterX.setFilterFieldName("y");
-//		filterX.setFilterLimits(i, i + 0.1);
-//		filterX.filter(*topTempX);
-//		// found the minY and maxY
-//		PointT topTempY_min, topTempY_max;
-//		pcl::getMinMax3D(*topTempX, topTempY_min, topTempY_max);
-//		PointT p1, g1;
-//		p1.y = i; p1.x = topTempY_min.x; p1.z = 0;
-//		g1.y = i; g1.x = topTempY_max.x; g1.z = 0;
-//		g1.r = 255;
-//		p1.r = 255;
-//		if (abs(p1.x) < 10000 && abs(p1.z) < 10000 && abs(g1.x) < 10000 && abs(g1.z) < 10000) {
-//			roofEdgePts->push_back(p1);
-//			roofEdgePts->push_back(g1);
-//		}
-//	}
-//    cout << "num " << roofEdgePts->size() << endl;
-//    simpleView("roof Edge", roofEdgePts);
-//
-//	vector<PointCloudT::Ptr> roofEdgeClusters;
-//	vector<Eigen::VectorXf> roofEdgeClustersCoffs;
-//	for (int m = 0; m < 10; ++m) {
-//		if(roofEdgePts->size() == 0) break;
-//		pcl::ModelCoefficients::Ptr sacCoefficients(new pcl::ModelCoefficients);
-//		pcl::PointIndices::Ptr sacInliers(new pcl::PointIndices);
-//		pcl::SACSegmentation<PointT> seg;
-//		seg.setOptimizeCoefficients(true);
-//		seg.setModelType(pcl::SACMODEL_LINE);
-//		seg.setMethodType(pcl::SAC_RANSAC);
-//		seg.setDistanceThreshold(0.05);
-//		seg.setInputCloud(roofEdgePts);
-//		seg.segment(*sacInliers, *sacCoefficients);
-//		Eigen::VectorXf coff(6);
-//		coff << sacCoefficients->values[0], sacCoefficients->values[1], sacCoefficients->values[2],
-//							 sacCoefficients->values[3], sacCoefficients->values[4], sacCoefficients->values[5];
-//
-//		PointCloudT::Ptr extracted_cloud(new PointCloudT);
-//		pcl::ExtractIndices<PointT> extract;
-//		extract.setInputCloud(roofEdgePts);
-//		extract.setIndices(sacInliers);
-//		extract.setNegative(false);
-//		extract.filter(*extracted_cloud);
-//		Reconstruction tmpRe(extracted_cloud);
-//		tmpRe.applyRegionGrow(paras.roof_NumberOfNeighbours, paras.roof_SmoothnessThreshold,
-//								paras.roof_CurvatureThreshold, paras.roof_MinSizeOfCluster, paras.KSearch);
-//		vector<PointCloudT::Ptr> clusters = tmpRe.clusters;
-//		for(auto &c:clusters) {
-//			roofEdgeClusters.push_back(c);
-//			roofEdgeClustersCoffs.push_back(coff);
-//		}
-//		extract.setNegative(true);
-//		extract.filter(*roofEdgePts);
-//		cout << "roofEdgePts size " << roofEdgePts->size() << endl;
-//	}
+/*    PointT min, max;
+    pcl::getMinMax3D(*topTemp,min,max);
+    simpleView("topTemp ", topTemp);
+    PointCloudT::Ptr roofEdgePts(new PointCloudT);
+    for (float i = min.x; i < max.x; i += step) { // NOLINT
+        // extract x within [i,i+step] -> tempX
+        PointCloudT::Ptr topTempX(new PointCloudT);
+        pcl::PassThrough<PointT> filterX;
+        filterX.setInputCloud(topTemp);
+        filterX.setFilterFieldName("x");
+        filterX.setFilterLimits(i, i + 0.1);
+        filterX.filter(*topTempX);
+        // found the minY and maxY
+        PointT topTempY_min, topTempY_max;
+        pcl::getMinMax3D(*topTempX, topTempY_min, topTempY_max);
+        PointT p1, g1;
+        p1.x = i; p1.y = topTempY_min.y; p1.z = 0;
+        g1.x = i; g1.y = topTempY_max.y; g1.z = 0;
+        g1.r = 255;
+        p1.r = 255;
+        if (abs(p1.y) < 10000 && abs(p1.z) < 10000 && abs(g1.y) < 10000 && abs(g1.z) < 10000) {
+            roofEdgePts->push_back(p1);
+            roofEdgePts->push_back(g1);
+        }
+    }
+	for (float i = min.y; i < max.y; i += step) { // NOLINT
+		// extract x within [i,i+step] -> tempX
+		PointCloudT::Ptr topTempX(new PointCloudT);
+		pcl::PassThrough<PointT> filterX;
+		filterX.setInputCloud(topTemp);
+		filterX.setFilterFieldName("y");
+		filterX.setFilterLimits(i, i + 0.1);
+		filterX.filter(*topTempX);
+		// found the minY and maxY
+		PointT topTempY_min, topTempY_max;
+		pcl::getMinMax3D(*topTempX, topTempY_min, topTempY_max);
+		PointT p1, g1;
+		p1.y = i; p1.x = topTempY_min.x; p1.z = 0;
+		g1.y = i; g1.x = topTempY_max.x; g1.z = 0;
+		g1.r = 255;
+		p1.r = 255;
+		if (abs(p1.x) < 10000 && abs(p1.z) < 10000 && abs(g1.x) < 10000 && abs(g1.z) < 10000) {
+			roofEdgePts->push_back(p1);
+			roofEdgePts->push_back(g1);
+		}
+	}
+    cout << "num " << roofEdgePts->size() << endl;
+    simpleView("roof Edge", roofEdgePts);
 
-//
+	vector<PointCloudT::Ptr> roofEdgeClusters;
+	vector<Eigen::VectorXf> roofEdgeClustersCoffs;
+	for (int m = 0; m < 10; ++m) {
+		if(roofEdgePts->size() == 0) break;
+		pcl::ModelCoefficients::Ptr sacCoefficients(new pcl::ModelCoefficients);
+		pcl::PointIndices::Ptr sacInliers(new pcl::PointIndices);
+		pcl::SACSegmentation<PointT> seg;
+		seg.setOptimizeCoefficients(true);
+		seg.setModelType(pcl::SACMODEL_LINE);
+		seg.setMethodType(pcl::SAC_RANSAC);
+		seg.setDistanceThreshold(0.05);
+		seg.setInputCloud(roofEdgePts);
+		seg.segment(*sacInliers, *sacCoefficients);
+		Eigen::VectorXf coff(6);
+		coff << sacCoefficients->values[0], sacCoefficients->values[1], sacCoefficients->values[2],
+							 sacCoefficients->values[3], sacCoefficients->values[4], sacCoefficients->values[5];
 
-//	vector<Eigen::Vector3i> colors;
-//	for (int k = 0; k < roofEdgeClusters.size(); ++k) {
-//		colors.push_back(Eigen::Vector3i(255,0,0)); // red
-//		colors.push_back(Eigen::Vector3i(255,255,0)); // yellow
-//		colors.push_back(Eigen::Vector3i(0,0,255)); // blue
-//		colors.push_back(Eigen::Vector3i(0,255,0)); // green
-//		colors.push_back(Eigen::Vector3i(0,255,255)); // cyan
-//		colors.push_back(Eigen::Vector3i(255,0,255)); // pink
-//	}
-//	PointCloudT::Ptr roofClusterPts(new PointCloudT);
-//	for (int l = 0; l < roofEdgeClusters.size(); ++l) {
-//		int color = 255 <<24 | colors[l][0] << 16 | colors[l][1] << 8 | colors[l][2];
-//		for (auto &p:roofEdgeClusters[l]->points) {
-//			p.rgba = color;
-//			roofClusterPts->push_back(p);
-//		}
-//	}
-//	cout << "roof segmentation: size of clusters: " << roofEdgeClusters.size() << endl;
-//	simpleView("roof Edge Segmentation", roofClusterPts);
-//
-//	// mark: filter the height based on z values of upDown Planes
-//	cout << "\nHeight Filter: point lower than " << ZLimits[0] << " and higher than " << ZLimits[1] << endl;
-//	for (auto &filledPlane : filledPlanes) {
-//		filledPlane.applyFilter("z", ZLimits[0], ZLimits[1]);
-//	}
-//
-//
-//	// Mark: we control the distance between two edges and the height difference between two edges
-//
-//	for (int i = 0; i < filledPlanes.size(); ++i) {
-//		Plane* plane_s = &filledPlanes[i];
-//		for (int j = i + 1; j < filledPlanes.size(); ++j) {
-//			Plane* plane_t = &filledPlanes[j];
-//			// mark: combine right -> left
-//			if (pcl::geometry::distance(plane_s->rightDown(), plane_t->leftDown()) < paras.minimumEdgeDist
-//				&& pcl::geometry::distance(plane_s->rightUp(), plane_t->leftUp()) < paras.minimumEdgeDist) {
-//				// mark: if the difference of edge too large, skip
-//				if (plane_s->getEdgeLength(EdgeRight) - plane_t->getEdgeLength(EdgeLeft) > paras.minHeightDiff) continue;
-//				Plane filled(plane_s->rightDown(), plane_s->rightUp(), plane_t->leftDown(), plane_t->leftUp(), paras.pointPitch, Color_Red);
-//				wallEdgePlanes.push_back(filled);
-//				plane_s->setType(PlaneType_MainWall); plane_t->setType(PlaneType::PlaneType_MainWall);
-//				// mark: combine left -> right
-//			}
-//			else if (pcl::geometry::distance(plane_s->leftDown(), plane_t->rightDown()) < paras.minimumEdgeDist
-//				&& pcl::geometry::distance(plane_s->leftUp(), plane_t->rightUp()) < paras.minimumEdgeDist) {
-//
-//				if (plane_s->getEdgeLength(EdgeLeft) - plane_t->getEdgeLength(EdgeRight) > paras.minHeightDiff) continue;
-//				plane_s->setType(PlaneType_MainWall); plane_t->setType(PlaneType_MainWall);
-//				Plane filled(plane_s->leftDown(), plane_s->leftUp(), plane_t->rightDown(), plane_t->rightUp(), paras.pointPitch, Color_Red);
-//				wallEdgePlanes.push_back(filled);
-//				// mark: combine left -> left
-//			}
-//			else if (pcl::geometry::distance(plane_s->leftDown(), plane_t->leftDown()) < paras.minimumEdgeDist
-//				&& pcl::geometry::distance(plane_s->leftUp(), plane_t->leftUp()) < paras.minimumEdgeDist) {
-//
-//				if (plane_s->getEdgeLength(EdgeLeft) - plane_t->getEdgeLength(EdgeLeft) > paras.minHeightDiff) continue;
-//				plane_s->setType(PlaneType_MainWall); plane_t->setType(PlaneType_MainWall);
-//				Plane filled(plane_s->leftDown(), plane_s->leftUp(), plane_t->leftDown(), plane_t->leftUp(), paras.pointPitch, Color_Red);
-//				wallEdgePlanes.push_back(filled);
-//				// mark: combine right -> right
-//			}
-//			else if (pcl::geometry::distance(plane_s->rightDown(), plane_t->rightDown()) < paras.minimumEdgeDist
-//				&& pcl::geometry::distance(plane_s->rightUp(), plane_t->rightUp()) < paras.minimumEdgeDist) {
-//
-//				if (plane_s->getEdgeLength(EdgeLeft) - plane_t->getEdgeLength(EdgeLeft) > paras.minHeightDiff) continue;
-//				plane_s->setType(PlaneType_MainWall); plane_t->setType(PlaneType_MainWall);
-//				Plane filled(plane_s->rightDown(), plane_s->rightUp(), plane_t->rightDown(), plane_t->rightUp(), paras.pointPitch, Color_Red);
-//				wallEdgePlanes.push_back(filled);
-//			}
-//		}
-//	}
-//
-//	// mark: extend main wall planes to z limits
-//	for (auto &filledPlane : filledPlanes) {
-//		Plane* plane = &filledPlane;
-//		if (plane->type() != PlaneType_MainWall) continue;
-//		PointT leftUp, rightUp, leftDown, rightDown;
-//		leftUp = plane->leftUp();    leftUp.z = ZLimits[1];
-//		rightUp = plane->rightUp();   rightUp.z = ZLimits[1];
-//		leftDown = plane->leftDown();  leftDown.z = ZLimits[0];
-//		rightDown = plane->rightDown(); rightDown.z = ZLimits[0];
-//		plane->extendPlane(leftUp, rightUp, plane->leftUp(), plane->rightUp(), paras.pointPitch);
-//		plane->extendPlane(leftDown, rightDown, plane->leftDown(), plane->rightDown(), paras.pointPitch);
-//	}
-//
-//	// mark: found outer planes for inner planes
-//	for (size_t i = 0; i < filledPlanes.size(); i++) {
-//		if (filledPlanes[i].type() != PlaneType_Other) continue;
-//		Plane* source = &filledPlanes[i];
-//		Eigen::Vector3d s_normal = source->getNormal();// calculatePlaneNormal(*source);
-//		double s_slope = s_normal[1] / s_normal[0];
-//		double s_b1 = source->leftUp().y - s_slope * source->leftUp().x;
-//		double s_b2 = source->rightUp().y - s_slope * source->rightUp().x;
-//		vector<Plane*> passedPlanes;
-//		for (size_t j = 0; j < filledPlanes.size(); j++) {
-//			Plane* target = &filledPlanes[j];
-//			// mark: First, ingore calculate with self and calculate witl other non-main wall parts
-//			if (i == j || target->type() == PlaneType_Other) continue;
-//			Eigen::Vector3d t_normal = target->getNormal();//calculatePlaneNormal(*target);
-//			// mark: Second, source plane should be inside in target plane (y-z,x-z plane)
-//			if (target->leftUp().z < source->leftUp().z ||
-//				target->rightUp().z < source->rightUp().z ||
-//				target->leftDown().z > source->leftDown().z ||
-//				target->rightDown().z > source->rightDown().z) {
-//				continue;
-//			}
-//
-//			// mark: Third, angle of two plane should smaller than minAngle
-//			double angle = acos(s_normal.dot(t_normal) / (s_normal.norm()*t_normal.norm())) * 180 / M_PI;
-//			if (angle > paras.minAngle_normalDiff) continue;
-//
-//			// TODO: in x-y plane, whether source plane could be covered by target plane
-//			bool cond1_p1 = (target->leftUp().y <= (target->leftUp().x * s_slope + s_b1)) && (target->leftUp().y <= (target->leftUp().x * s_slope + s_b2));
-//			bool cond1_p2 = (target->rightUp().y >= (target->rightUp().x * s_slope + s_b1)) && (target->rightUp().y >= (target->rightUp().x * s_slope + s_b2));
-//
-//			bool cond2_p1 = (target->leftUp().y >= (target->leftUp().x * s_slope + s_b1)) && (target->leftUp().y >= (target->leftUp().x * s_slope + s_b2));
-//			bool cond2_p2 = (target->rightUp().y <= (target->rightUp().x * s_slope + s_b1)) && (target->rightUp().y <= (target->rightUp().x * s_slope + s_b2));
-//
-//			if ((cond1_p1 && cond1_p2) || (cond2_p1 && cond2_p2)) {
-//				passedPlanes.push_back(target);
-//			}
-//		}
-//
-//		// mark: if passedPlanes exceed 1, we choose the nearest one.
-//		// fixme: the center may not correct since we assume it is a perfect rectangular
-//		if (!passedPlanes.empty()) {
-//			float minDist = INT_MAX;
-//			size_t minDist_index = 0;
-//			PointT s_center;
-//			s_center.x = (source->rightUp().x + source->leftUp().x) / 2;
-//			s_center.y = (source->rightUp().y + source->leftUp().y) / 2;
-//			s_center.y = (source->rightUp().z + source->rightDown().z) / 2;
-//			for (size_t k = 0; k < passedPlanes.size(); ++k) {
-//				PointT t_center;
-//				t_center.x = (passedPlanes[k]->rightUp().x + passedPlanes[k]->leftUp().x) / 2;
-//				t_center.y = (passedPlanes[k]->rightUp().y + passedPlanes[k]->leftUp().y) / 2;
-//				t_center.y = (passedPlanes[k]->rightUp().z + passedPlanes[k]->rightDown().z) / 2;
-//				if (pcl::geometry::distance(s_center, t_center) < minDist) {
-//					minDist = pcl::geometry::distance(s_center, t_center);
-//					minDist_index = k;
-//				}
-//			}
-//			source->coveredPlane = passedPlanes[minDist_index];
-//		}
-//	}
-//
-//	// mark: since we found the covered planes, we next extend these smaller planes to their covered planes.
-//	for (auto &filledPlane : filledPlanes) {
-//		Plane* plane = &filledPlane;
-//		if (plane->coveredPlane == nullptr) continue;
-//		plane->setColor(innerPlaneColor);
-//		// mark: find the projection of plane to its covered plane -> pink
-//		extendSmallPlaneToBigPlane(*plane, *plane->coveredPlane, 4294951115, paras.pointPitch, allCloudFilled);
-//	}
-//
-//	// for final all visualization
-//	for (auto &filledPlane : filledPlanes) {
-//		for (size_t j = 0; j < filledPlane.pointCloud->points.size(); j++) {
-//			allCloudFilled->points.push_back(filledPlane.pointCloud->points[j]);
-//		}
-//	}
-//
-//	for (auto &wallEdgePlane : wallEdgePlanes) {
-//		for (size_t j = 0; j < wallEdgePlane.pointCloud->points.size(); j++) {
-//			allCloudFilled->points.push_back(wallEdgePlane.pointCloud->points[j]);
-//		}
-//	}
-//
-//	// fill the ceiling and ground
-//	/*{
-//		PointT min, max;
-//		float step = 1 / (float)paras.pointPitch;
-//		pcl::getMinMax3D(*allCloudFilled, min, max);
-//		PointCloudT::Ptr topTemp(new PointCloudT);
-//		PointCloudT::Ptr downTemp(new PointCloudT);
-//		pcl::copyPointCloud(*allCloudFilled, *topTemp);
-//		pcl::copyPointCloud(*allCloudFilled, *downTemp);
-//		pcl::PassThrough<PointT> filterZ;
-//		filterZ.setInputCloud(topTemp);
-//		filterZ.setFilterFieldName("z");
-//		filterZ.setFilterLimits(max.z - 2 * step, max.z);
-//		filterZ.filter(*topTemp);
-//		filterZ.setInputCloud(downTemp);
-//		filterZ.setFilterFieldName("z");
-//		filterZ.setFilterLimits(min.z, min.z + 2 * step);
-//		filterZ.filter(*downTemp);
-//
-//		for (float i = min.x; i < max.x; i += step) { // NOLINT
-//			// extract x within [i,i+step] -> tempX
-//			PointCloudT::Ptr topTempX(new PointCloudT);
-//			PointCloudT::Ptr downTempX(new PointCloudT);
-//			pcl::PassThrough<PointT> filterX;
-//			filterX.setInputCloud(topTemp);
-//			filterX.setFilterFieldName("x");
-//			filterX.setFilterLimits(i, i + 0.1);
-//			filterX.filter(*topTempX);
-//			filterX.setInputCloud(downTemp);
-//			filterX.filter(*downTempX);
-//			// found the minY and maxY
-//			PointT topTempY_min, topTempY_max;
-//			PointT downTempY_min, downTempY_max;
-//			pcl::getMinMax3D(*topTempX, topTempY_min, topTempY_max);
-//			pcl::getMinMax3D(*downTempX, downTempY_min, downTempY_max);
-//
-//			PointT p1, g1, p2, g2;
-//			p1.x = i; p1.y = topTempY_min.y; p1.z = topTempY_max.z;
-//			g1.x = i; g1.y = topTempY_max.y; g1.z = topTempY_max.z;
-//			p2.x = i; p2.y = downTempY_min.y; p2.z = downTempY_min.z;
-//			g2.x = i; g2.y = downTempY_max.y; g2.z = downTempY_min.z;
-//			if (abs(p1.y) < 10000 && abs(p1.z) < 10000 && abs(g1.y) < 10000 && abs(g1.z) < 10000) {
-//				generateLinePointCloud(p1, g1, paras.pointPitch, 0 << 24 | 255, allCloudFilled);
-//			}
-//			if (abs(p2.y) < 10000 && abs(p2.z) < 10000 && abs(g2.y) < 10000 && abs(g2.z) < 10000) {
-//				generateLinePointCloud(p2, g2, paras.pointPitch, 255 << 24 | 255, allCloudFilled);
-//			}
-//		}
-//	}*/
-//
-//
-//	pcl::io::savePLYFile("OutputData/6_AllPlanes.ply", *allCloudFilled);
-//	simpleView("cloud Filled", allCloudFilled);
-	return (0);
+		PointCloudT::Ptr extracted_cloud(new PointCloudT);
+		pcl::ExtractIndices<PointT> extract;
+		extract.setInputCloud(roofEdgePts);
+		extract.setIndices(sacInliers);
+		extract.setNegative(false);
+		extract.filter(*extracted_cloud);
+		Reconstruction tmpRe(extracted_cloud);
+		tmpRe.applyRegionGrow(paras.roof_NumberOfNeighbours, paras.roof_SmoothnessThreshold,
+								paras.roof_CurvatureThreshold, paras.roof_MinSizeOfCluster, paras.KSearch);
+		vector<PointCloudT::Ptr> clusters = tmpRe.clusters;
+		for(auto &c:clusters) {
+			roofEdgeClusters.push_back(c);
+			roofEdgeClustersCoffs.push_back(coff);
+		}
+		extract.setNegative(true);
+		extract.filter(*roofEdgePts);
+		cout << "roofEdgePts size " << roofEdgePts->size() << endl;
+	}
+
+
+
+	vector<Eigen::Vector3i> colors;
+	for (int k = 0; k < roofEdgeClusters.size(); ++k) {
+		colors.push_back(Eigen::Vector3i(255,0,0)); // red
+		colors.push_back(Eigen::Vector3i(255,255,0)); // yellow
+		colors.push_back(Eigen::Vector3i(0,0,255)); // blue
+		colors.push_back(Eigen::Vector3i(0,255,0)); // green
+		colors.push_back(Eigen::Vector3i(0,255,255)); // cyan
+		colors.push_back(Eigen::Vector3i(255,0,255)); // pink
+	}
+	PointCloudT::Ptr roofClusterPts(new PointCloudT);
+	for (int l = 0; l < roofEdgeClusters.size(); ++l) {
+		int color = 255 <<24 | colors[l][0] << 16 | colors[l][1] << 8 | colors[l][2];
+		for (auto &p:roofEdgeClusters[l]->points) {
+			p.rgba = color;
+			roofClusterPts->push_back(p);
+		}
+	}
+	cout << "roof segmentation: size of clusters: " << roofEdgeClusters.size() << endl;
+	simpleView("roof Edge Segmentation", roofClusterPts);
+
+	// mark: filter the height based on z values of upDown Planes
+	cout << "\nHeight Filter: point lower than " << ZLimits[0] << " and higher than " << ZLimits[1] << endl;
+	for (auto &filledPlane : filledPlanes) {
+		filledPlane.applyFilter("z", ZLimits[0], ZLimits[1]);
+	}
+
+
+	// Mark: we control the distance between two edges and the height difference between two edges
+
+	for (int i = 0; i < filledPlanes.size(); ++i) {
+		Plane* plane_s = &filledPlanes[i];
+		for (int j = i + 1; j < filledPlanes.size(); ++j) {
+			Plane* plane_t = &filledPlanes[j];
+			// mark: combine right -> left
+			if (pcl::geometry::distance(plane_s->rightDown(), plane_t->leftDown()) < paras.minimumEdgeDist
+				&& pcl::geometry::distance(plane_s->rightUp(), plane_t->leftUp()) < paras.minimumEdgeDist) {
+				// mark: if the difference of edge too large, skip
+				if (plane_s->getEdgeLength(EdgeRight) - plane_t->getEdgeLength(EdgeLeft) > paras.minHeightDiff) continue;
+				Plane filled(plane_s->rightDown(), plane_s->rightUp(), plane_t->leftDown(), plane_t->leftUp(), paras.pointPitch, Color_Red);
+				wallEdgePlanes.push_back(filled);
+				plane_s->setType(PlaneType_MainWall); plane_t->setType(PlaneType::PlaneType_MainWall);
+				// mark: combine left -> right
+			}
+			else if (pcl::geometry::distance(plane_s->leftDown(), plane_t->rightDown()) < paras.minimumEdgeDist
+				&& pcl::geometry::distance(plane_s->leftUp(), plane_t->rightUp()) < paras.minimumEdgeDist) {
+
+				if (plane_s->getEdgeLength(EdgeLeft) - plane_t->getEdgeLength(EdgeRight) > paras.minHeightDiff) continue;
+				plane_s->setType(PlaneType_MainWall); plane_t->setType(PlaneType_MainWall);
+				Plane filled(plane_s->leftDown(), plane_s->leftUp(), plane_t->rightDown(), plane_t->rightUp(), paras.pointPitch, Color_Red);
+				wallEdgePlanes.push_back(filled);
+				// mark: combine left -> left
+			}
+			else if (pcl::geometry::distance(plane_s->leftDown(), plane_t->leftDown()) < paras.minimumEdgeDist
+				&& pcl::geometry::distance(plane_s->leftUp(), plane_t->leftUp()) < paras.minimumEdgeDist) {
+
+				if (plane_s->getEdgeLength(EdgeLeft) - plane_t->getEdgeLength(EdgeLeft) > paras.minHeightDiff) continue;
+				plane_s->setType(PlaneType_MainWall); plane_t->setType(PlaneType_MainWall);
+				Plane filled(plane_s->leftDown(), plane_s->leftUp(), plane_t->leftDown(), plane_t->leftUp(), paras.pointPitch, Color_Red);
+				wallEdgePlanes.push_back(filled);
+				// mark: combine right -> right
+			}
+			else if (pcl::geometry::distance(plane_s->rightDown(), plane_t->rightDown()) < paras.minimumEdgeDist
+				&& pcl::geometry::distance(plane_s->rightUp(), plane_t->rightUp()) < paras.minimumEdgeDist) {
+
+				if (plane_s->getEdgeLength(EdgeLeft) - plane_t->getEdgeLength(EdgeLeft) > paras.minHeightDiff) continue;
+				plane_s->setType(PlaneType_MainWall); plane_t->setType(PlaneType_MainWall);
+				Plane filled(plane_s->rightDown(), plane_s->rightUp(), plane_t->rightDown(), plane_t->rightUp(), paras.pointPitch, Color_Red);
+				wallEdgePlanes.push_back(filled);
+			}
+		}
+	}
+
+	// mark: extend main wall planes to z limits
+	for (auto &filledPlane : filledPlanes) {
+		Plane* plane = &filledPlane;
+		if (plane->type() != PlaneType_MainWall) continue;
+		PointT leftUp, rightUp, leftDown, rightDown;
+		leftUp = plane->leftUp();    leftUp.z = ZLimits[1];
+		rightUp = plane->rightUp();   rightUp.z = ZLimits[1];
+		leftDown = plane->leftDown();  leftDown.z = ZLimits[0];
+		rightDown = plane->rightDown(); rightDown.z = ZLimits[0];
+		plane->extendPlane(leftUp, rightUp, plane->leftUp(), plane->rightUp(), paras.pointPitch);
+		plane->extendPlane(leftDown, rightDown, plane->leftDown(), plane->rightDown(), paras.pointPitch);
+	}
+
+	// mark: found outer planes for inner planes
+	for (size_t i = 0; i < filledPlanes.size(); i++) {
+		if (filledPlanes[i].type() != PlaneType_Other) continue;
+		Plane* source = &filledPlanes[i];
+		Eigen::Vector3d s_normal = source->getNormal();// calculatePlaneNormal(*source);
+		double s_slope = s_normal[1] / s_normal[0];
+		double s_b1 = source->leftUp().y - s_slope * source->leftUp().x;
+		double s_b2 = source->rightUp().y - s_slope * source->rightUp().x;
+		vector<Plane*> passedPlanes;
+		for (size_t j = 0; j < filledPlanes.size(); j++) {
+			Plane* target = &filledPlanes[j];
+			// mark: First, ingore calculate with self and calculate witl other non-main wall parts
+			if (i == j || target->type() == PlaneType_Other) continue;
+			Eigen::Vector3d t_normal = target->getNormal();//calculatePlaneNormal(*target);
+			// mark: Second, source plane should be inside in target plane (y-z,x-z plane)
+			if (target->leftUp().z < source->leftUp().z ||
+				target->rightUp().z < source->rightUp().z ||
+				target->leftDown().z > source->leftDown().z ||
+				target->rightDown().z > source->rightDown().z) {
+				continue;
+			}
+
+			// mark: Third, angle of two plane should smaller than minAngle
+			double angle = acos(s_normal.dot(t_normal) / (s_normal.norm()*t_normal.norm())) * 180 / M_PI;
+			if (angle > paras.minAngle_normalDiff) continue;
+
+			// TODO: in x-y plane, whether source plane could be covered by target plane
+			bool cond1_p1 = (target->leftUp().y <= (target->leftUp().x * s_slope + s_b1)) && (target->leftUp().y <= (target->leftUp().x * s_slope + s_b2));
+			bool cond1_p2 = (target->rightUp().y >= (target->rightUp().x * s_slope + s_b1)) && (target->rightUp().y >= (target->rightUp().x * s_slope + s_b2));
+
+			bool cond2_p1 = (target->leftUp().y >= (target->leftUp().x * s_slope + s_b1)) && (target->leftUp().y >= (target->leftUp().x * s_slope + s_b2));
+			bool cond2_p2 = (target->rightUp().y <= (target->rightUp().x * s_slope + s_b1)) && (target->rightUp().y <= (target->rightUp().x * s_slope + s_b2));
+
+			if ((cond1_p1 && cond1_p2) || (cond2_p1 && cond2_p2)) {
+				passedPlanes.push_back(target);
+			}
+		}
+
+		// mark: if passedPlanes exceed 1, we choose the nearest one.
+		// fixme: the center may not correct since we assume it is a perfect rectangular
+		if (!passedPlanes.empty()) {
+			float minDist = INT_MAX;
+			size_t minDist_index = 0;
+			PointT s_center;
+			s_center.x = (source->rightUp().x + source->leftUp().x) / 2;
+			s_center.y = (source->rightUp().y + source->leftUp().y) / 2;
+			s_center.y = (source->rightUp().z + source->rightDown().z) / 2;
+			for (size_t k = 0; k < passedPlanes.size(); ++k) {
+				PointT t_center;
+				t_center.x = (passedPlanes[k]->rightUp().x + passedPlanes[k]->leftUp().x) / 2;
+				t_center.y = (passedPlanes[k]->rightUp().y + passedPlanes[k]->leftUp().y) / 2;
+				t_center.y = (passedPlanes[k]->rightUp().z + passedPlanes[k]->rightDown().z) / 2;
+				if (pcl::geometry::distance(s_center, t_center) < minDist) {
+					minDist = pcl::geometry::distance(s_center, t_center);
+					minDist_index = k;
+				}
+			}
+			source->coveredPlane = passedPlanes[minDist_index];
+		}
+	}
+
+	// mark: since we found the covered planes, we next extend these smaller planes to their covered planes.
+	for (auto &filledPlane : filledPlanes) {
+		Plane* plane = &filledPlane;
+		if (plane->coveredPlane == nullptr) continue;
+		plane->setColor(innerPlaneColor);
+		// mark: find the projection of plane to its covered plane -> pink
+		extendSmallPlaneToBigPlane(*plane, *plane->coveredPlane, 4294951115, paras.pointPitch, allCloudFilled);
+	}
+
+	// for final all visualization
+	for (auto &filledPlane : filledPlanes) {
+		for (size_t j = 0; j < filledPlane.pointCloud->points.size(); j++) {
+			allCloudFilled->points.push_back(filledPlane.pointCloud->points[j]);
+		}
+	}
+
+	for (auto &wallEdgePlane : wallEdgePlanes) {
+		for (size_t j = 0; j < wallEdgePlane.pointCloud->points.size(); j++) {
+			allCloudFilled->points.push_back(wallEdgePlane.pointCloud->points[j]);
+		}
+	}
+
+	// fill the ceiling and ground
+	{
+		PointT min, max;
+		float step = 1 / (float)paras.pointPitch;
+		pcl::getMinMax3D(*allCloudFilled, min, max);
+		PointCloudT::Ptr topTemp(new PointCloudT);
+		PointCloudT::Ptr downTemp(new PointCloudT);
+		pcl::copyPointCloud(*allCloudFilled, *topTemp);
+		pcl::copyPointCloud(*allCloudFilled, *downTemp);
+		pcl::PassThrough<PointT> filterZ;
+		filterZ.setInputCloud(topTemp);
+		filterZ.setFilterFieldName("z");
+		filterZ.setFilterLimits(max.z - 2 * step, max.z);
+		filterZ.filter(*topTemp);
+		filterZ.setInputCloud(downTemp);
+		filterZ.setFilterFieldName("z");
+		filterZ.setFilterLimits(min.z, min.z + 2 * step);
+		filterZ.filter(*downTemp);
+
+		for (float i = min.x; i < max.x; i += step) { // NOLINT
+			// extract x within [i,i+step] -> tempX
+			PointCloudT::Ptr topTempX(new PointCloudT);
+			PointCloudT::Ptr downTempX(new PointCloudT);
+			pcl::PassThrough<PointT> filterX;
+			filterX.setInputCloud(topTemp);
+			filterX.setFilterFieldName("x");
+			filterX.setFilterLimits(i, i + 0.1);
+			filterX.filter(*topTempX);
+			filterX.setInputCloud(downTemp);
+			filterX.filter(*downTempX);
+			// found the minY and maxY
+			PointT topTempY_min, topTempY_max;
+			PointT downTempY_min, downTempY_max;
+			pcl::getMinMax3D(*topTempX, topTempY_min, topTempY_max);
+			pcl::getMinMax3D(*downTempX, downTempY_min, downTempY_max);
+
+			PointT p1, g1, p2, g2;
+			p1.x = i; p1.y = topTempY_min.y; p1.z = topTempY_max.z;
+			g1.x = i; g1.y = topTempY_max.y; g1.z = topTempY_max.z;
+			p2.x = i; p2.y = downTempY_min.y; p2.z = downTempY_min.z;
+			g2.x = i; g2.y = downTempY_max.y; g2.z = downTempY_min.z;
+			if (abs(p1.y) < 10000 && abs(p1.z) < 10000 && abs(g1.y) < 10000 && abs(g1.z) < 10000) {
+				generateLinePointCloud(p1, g1, paras.pointPitch, 0 << 24 | 255, allCloudFilled);
+			}
+			if (abs(p2.y) < 10000 && abs(p2.z) < 10000 && abs(g2.y) < 10000 && abs(g2.z) < 10000) {
+				generateLinePointCloud(p2, g2, paras.pointPitch, 255 << 24 | 255, allCloudFilled);
+			}
+		}
+	}
+
+
+	pcl::io::savePLYFile("OutputData/6_AllPlanes.ply", *allCloudFilled);
+	simpleView("cloud Filled", allCloudFilled);
+	return (0);*/
 }
 
 
@@ -726,46 +745,37 @@ void smoothNoise(PointCloudT::Ptr input, int K, float beta) {
 }
 
 void densityFilter(PointCloudT::Ptr input){
+	float alpha2   = Paras<float>("DensityFilter","alpha2");
+    float leafSize = Paras<float>("DensityFilter","leafSize");
 	int n = input->size();
+	PointCloudT::Ptr filtered(new PointCloudT);
 	pcl::VoxelGrid<PointT> sor;
 	sor.setInputCloud (input);
-	sor.setLeafSize (0.05, 0.05, 0.05);
-	int minI = INT_MAX, minJ = INT_MAX, minK = INT_MAX;
-	int maxI = INT_MIN, maxJ = INT_MIN, maxK = INT_MIN;
-	for (auto&p : input->points) {
-		Eigen::Vector3i ijk = sor.getGridCoordinates(p.x, p.y, p.z);
-		minI = min(ijk[0] , minI);
-		minJ = min(ijk[1] , minJ);
-		minK = min(ijk[2] , minK);
+	sor.setLeafSize (leafSize, leafSize, leafSize);
+	sor.filter(*filtered);
+	Eigen::Vector3i divisions = sor.getNrDivisions();
 
-		maxI = max(ijk[0] , maxI);
-		maxJ = max(ijk[1] , maxJ);
-		maxK = max(ijk[2] , maxK);
+	vector<vector<int>> voxels(divisions[0]*divisions[1]*divisions[2], vector<int>());
+
+	for (int i = 0; i < input->points.size(); ++i) {
+		auto cord = sor.getGridCoordinates(input->points[i].x, input->points[i].y, input->points[i].z);
+		cord = cord - sor.getMinBoxCoordinates();
+		voxels[cord[0]*divisions[1]*divisions[2] + cord[1]*divisions[2] + cord[2]].push_back(i);
 	}
-	int n_i = maxI - minI + 1, n_j = maxJ - minJ + 1, n_k = maxK - minK + 1;
-	vector<vector<vector< vector<Eigen::Vector3i> >>> grids(n_i,
-                                                            vector<vector< vector<Eigen::Vector3i> >>(n_j,
-                                                            vector< vector<Eigen::Vector3i> >(n_k)));
-
-	for (auto&p : input->points) {
-		Eigen::Vector3i ijk = sor.getGridCoordinates(p.x, p.y, p.z);
-		int i = ijk[0] - minI;
-		int j = ijk[1] - minJ;
-		int k = ijk[2] - minK;
-		grids[i][j][k].push_back(Eigen::Vector3i{i,j,k});
-		//grids[i][j][k].push_back(p);
+	vector<float> voxelsNums;
+	for (auto &voxel: voxels) {
+		if (voxel.size()!=0) voxelsNums.push_back(voxel.size());
 	}
+	float mean, stdev;
+	calculateMeanStandardDev(voxelsNums, mean, stdev);
+	cout <<  "[densityFilter] mean " << mean << ", stdev " << stdev << endl;
 
-	int testTotal = 0;
-//	for (auto &i : grids) {
-//		for (auto &j : i) {
-//			for (auto &k : j) {
-//				testTotal += k.size();
-//			}
-//		}
-//	}
-
-	cout << testTotal << endl;
+	PointCloudT::Ptr output(new PointCloudT);
+	for (auto &voxel: voxels) {
+		if (voxel.size() < (mean - stdev*alpha2)) continue;
+		for (auto &idx :  voxel) output->push_back(input->points[idx]);
+	}
+	copyPointCloud(*output, *input);
 	cout << "[density Filter] left " << input->size() << " from " << n << endl;
 }
 
@@ -813,7 +823,7 @@ void extractTopPts(PointCloudT::Ptr input, PointCloudT::Ptr output, float highes
 }
 
 void convert2D(PointCloudT::Ptr input,PointCloudT::Ptr output) {
-    pcl::copyPoint(*input, *output);
+    pcl::copyPointCloud(*input, *output);
     for(auto& p : output->points) {
         p.z = 0;
     }
@@ -1016,7 +1026,7 @@ void ptsToLine(PointCloudT::Ptr input, Eigen::VectorXf& paras, EdgeLine& output)
 	}
 
 	PointT p,q;
-	p.z = 1; q.z = 1;
+	p.z = 0; q.z = 0;
 	if (k1>0) {
 		p.x = minX;
 		p.y = minY;
@@ -1130,4 +1140,100 @@ void calculateNormals(PointCloudT::Ptr input, pcl::PointCloud <pcl::Normal>::Ptr
         input->points[i].normal_z = normals_all->points[i].normal_z;
     }
 }
+
+
+void applyBeamExtraction(PointCloudT::Ptr input,float high, vector<EdgeLine>& edgeLines){
+	float possibleHeight = 0.5;
+	PointCloudT::Ptr inputTmp(new PointCloudT);
+	pcl::copyPointCloud(*input,*inputTmp);
+	pcl::PassThrough<PointT> filterZ;
+	filterZ.setInputCloud(inputTmp);
+	filterZ.setFilterFieldName("z");
+	filterZ.setFilterLimits(high-possibleHeight, high - 0.1);
+	filterZ.filter(*inputTmp);
+
+
+	simpleView("[applyBeamExtraction] extract Z", inputTmp);
+
+	PointCloudT::Ptr filterPts(new PointCloudT);
+	VoxelGrid<PointT> sor;
+	sor.setInputCloud(inputTmp);
+	sor.setLeafSize(0.07,0.07,20);
+	sor.filter(*filterPts);
+	Eigen::Vector3i divisions =  sor.getNrDivisions();
+
+
+	// put points index to each voxel
+	vector<vector<int>> voxels(divisions[0]*divisions[1]*divisions[2], vector<int>());
+	for (int i = 0; i < inputTmp->points.size(); ++i) {
+		auto cord = sor.getGridCoordinates(inputTmp->points[i].x, inputTmp->points[i].y, inputTmp->points[i].z);
+		cord = cord - sor.getMinBoxCoordinates();
+		voxels[cord[0]*divisions[1]*divisions[2] + cord[1]*divisions[2] + cord[2]].push_back(i);
+	}
+	// test result
+	int testSum = 0;
+	int maxNum = 0;
+	for (auto voxel:voxels) {
+		testSum += voxel.size();
+		maxNum = max(maxNum, (int)voxel.size());
+	}
+
+	assert(testSum == inputTmp->points.size());
+	cout << "[applyBeamExtraction] maxNum " << maxNum << endl;
+	// filter the voxel cell whose size is smaller than
+	filterPts->resize(0);
+	assert(filterPts->size() == 0);
+	for (auto voxel:voxels) {
+		if (voxel.size() > 10) for(auto &idx : voxel) filterPts->push_back(inputTmp->points[idx]);
+	}
+
+	cout << "[applyBeamExtraction]  before " << inputTmp->size() << "  after " << filterPts->size() << endl;
+
+	simpleView("[applyBeamExtraction] filterP pts", filterPts);
+
+	PointCloudT::Ptr removeLinesPts(new PointCloudT);
+	removePtsAroundLine(filterPts,removeLinesPts, edgeLines, 0.5);
+}
+
+void removePtsAroundLine(PointCloudT::Ptr input, PointCloudT::Ptr output, vector<EdgeLine>& lines, float dist){
+	PointCloudT::Ptr allPts(new PointCloudT);
+	copyPointCloud(*input, *allPts);
+	for (auto &p : allPts->points) p.z = 0;
+	vector<PointCloudT::Ptr> linesPts;
+	for (auto &line: lines) {
+		PointCloudT::Ptr tmp(new PointCloudT);
+		generateLinePointCloud(line.p, line.q, 100, 255 <<24 | 1255 << 16 | 0 << 8 | 0, tmp);
+		linesPts.push_back(tmp);
+		for (auto& p: tmp->points) allPts->push_back(p);
+	}
+
+	simpleView("[removePtsAroundLine] allPts" ,allPts);
+
+	PointCloudT::Ptr filtered(new PointCloudT);
+	VoxelGrid<PointT> sor;
+	sor.setInputCloud(allPts);
+	sor.setLeafSize(dist,dist,20);
+	sor.filter(*filtered);
+	Eigen::Vector3i divisions = sor.getNrDivisions();
+	cout << divisions.transpose() << endl;
+	unordered_set<int> filterGridIdx;
+	for (auto &linePts : linesPts) {
+		for (auto &p : linePts->points) {
+			auto cord = sor.getGridCoordinates(p.x, p.y, p.z);
+			cord = cord - sor.getMinBoxCoordinates();
+			filterGridIdx.insert(cord[0]*divisions[1]*divisions[2] + cord[1]*divisions[2] + cord[2]);
+		}
+	}
+
+	for (auto &p : input->points) {
+		auto cord = sor.getGridCoordinates(p.x, p.y, p.z);
+		cord = cord - sor.getMinBoxCoordinates();
+		if (filterGridIdx.count(cord[0]*divisions[1]*divisions[2] + cord[1]*divisions[2] + cord[2])) continue;
+		output->push_back(p);
+	}
+	cout << "[removePtsAroundLine] before " << input->size() << "  after " << output->size() << endl;
+	simpleView("[removePtsAroundLine] ",output);
+}
+
+
 

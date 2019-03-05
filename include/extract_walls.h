@@ -90,4 +90,8 @@ void calculateMeanStandardDev(vector<float> v, float& mean, float& stdev);
 void calculateNormals(PointCloudT::Ptr input, pcl::PointCloud <pcl::Normal>::Ptr &normals_all, int KSearch);
 void regionGrow(PointCloudT::Ptr input, int NumberOfNeighbours, int SmoothnessThreshold, int CurvatureThreshold,
                 int MinSizeOfCluster, int KSearch, vector<PointCloudT::Ptr>& outputClusters);
+
+void applyBeamExtraction(PointCloudT::Ptr input, float high, vector<EdgeLine>& edgeLines);
+
+void removePtsAroundLine(PointCloudT::Ptr input, PointCloudT::Ptr output, vector<EdgeLine>& lines, float dist);
 #endif //TEST_PCL_EXTRACTWALL_H

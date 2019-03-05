@@ -59,6 +59,9 @@ if(UNIX AND NOT APPLE)
   target_link_libraries(${PROJECT_NAME}
           ${PCL_LIBRARIES})
 
+  #YAML
+  find_package(  yaml-cpp REQUIRED )
+  target_link_libraries(${PROJECT_NAME} ${YAML_CPP_LIBRARIES})
 
   add_executable(extractWall extract_walls.cpp)
   target_link_libraries (extractWall ${PROJECT_NAME})
