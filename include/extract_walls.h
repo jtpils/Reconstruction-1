@@ -102,4 +102,6 @@ void calculateNormal2D(PointCloudT::Ptr input, PointCloud<Normal>::Ptr cloud_nor
 
 void BeamRANSAC(PointCloudT::Ptr input, float high);
 vector<PointT> findEdgeForPlane(PointCloudT::Ptr input);
+
+void exportToDxf(string outputPath, vector<EdgeLine>& lines, float minZ, float maxZ);
 #endif //TEST_PCL_EXTRACTWALL_H
