@@ -100,4 +100,6 @@ void removePtsAroundLine(PointCloudT::Ptr input, PointCloudT::Ptr output, vector
 void regionGrow2D(PointCloudT::Ptr input, vector<PointCloudT::Ptr>& output);
 void calculateNormal2D(PointCloudT::Ptr input, PointCloud<Normal>::Ptr cloud_normals);
 
+void BeamRANSAC(PointCloudT::Ptr input, float high);
+vector<PointT> findEdgeForPlane(PointCloudT::Ptr input);
 #endif //TEST_PCL_EXTRACTWALL_H

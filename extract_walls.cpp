@@ -165,8 +165,6 @@ int main(int argc, char** argv) {
     densityFilter(re.pointCloud);
 	if (Paras<bool>("View","densityFilter")) simpleView("[densityFilter]", re.pointCloud);
 
-
-
 /*	re.downSampling(paras.leafSize);
 	re.outputFile("TestData/Room_F.ply");
 	pcl::io::savePCDFile("TestData/Room_A.pcd", *re.pointCloud);
@@ -240,26 +238,27 @@ int main(int argc, char** argv) {
     PointCloudT::Ptr hullOutput(new PointCloudT);
     computeHull(largestComp, hullOutput, Paras<float>("ComputeHull","alpha"));
 
-
 	if (Paras<bool>("View","hull")) simpleView("[compute hull] ", hullOutput);
 
     // extract lines from edge point clouds
     vector<EdgeLine> edgeLines;
     extractLineFromEdge(hullOutput, edgeLines);
-	simpleView("[extractLineFromEdge] " , edgeLines);
+	if (Paras<bool>("View","extractLine")) simpleView("[extractLineFromEdge] result" , edgeLines);
 
 
 	// extract lines from edge point clouds
 	vector<EdgeLine> edgeLines2;
 	extractLineFromEdge2(hullOutput, edgeLines2);
-	simpleView("[extractLineFromEdge2] " , edgeLines2);
+	if (Paras<bool>("View","extractLine")) simpleView("[extractLineFromEdge2] result " , edgeLines2);
 
 
-	applyBeamExtraction(re.pointCloud, heightHigh, edgeLines);
+	//if (Paras<bool>("BeamRecons","isExist")) applyBeamExtraction(re.pointCloud, heightHigh, edgeLines);
 
-	findLinkedLines(edgeLines);
+	if (Paras<bool>("BeamRecons","isExist")) BeamRANSAC(re.pointCloud,heightHigh);
+
+	findLinkedLines(edgeLines2);
 	cout << "after find linked lines, extract " << edgeLines.size() << " lines\n";
-	if (Paras<bool>("View","linkedEdges")) simpleView("line pts after findLinkedLines" , edgeLines);
+	if (Paras<bool>("View","linkedEdges")) simpleView("line pts after findLinkedLines" , edgeLines2);
 
     return 0;
 /*    PointT min, max;
@@ -927,7 +926,7 @@ void extractLineFromEdge2(PointCloudT::Ptr input, vector<EdgeLine>& edgeLines){
 	regionGrow2D(input, reginGrow2DOutput);
 
 	assert(reginGrow2DOutput.size() > 0);
-	simpleView("[extractLineFromEdge2] regionGrow2DOutput",reginGrow2DOutput);
+	if (Paras<bool>("View","extractLine")) simpleView("[extractLineFromEdge2] regionGrow2DOutput",reginGrow2DOutput);
 
 	// using new Generate Pts
 	for (auto &Pts : reginGrow2DOutput) {
@@ -1315,3 +1314,112 @@ void calculateNormal2D(PointCloudT::Ptr input, PointCloud<Normal>::Ptr cloud_nor
     }
 }
 
+void BeamRANSAC(PointCloudT::Ptr input, float high){
+	float possibleHeight = 0.5;
+	PointCloudT::Ptr inputTmp(new PointCloudT);
+	pcl::copyPointCloud(*input,*inputTmp);
+	pcl::PassThrough<PointT> filterZ;
+	filterZ.setInputCloud(inputTmp);
+	filterZ.setFilterFieldName("z");
+	filterZ.setFilterLimits(high-possibleHeight, high - 0.1);
+	filterZ.filter(*inputTmp);
+	simpleView("[BeamRANSAC] extract Z", inputTmp);
+
+	//regionGrow(inputTmp, int NumberOfNeighbours, int SmoothnessThreshold, int CurvatureThreshold,
+			//int MinSizeOfCluster, int KSearch, vector<PointCloudT::Ptr>& outputClusters);
+	vector<PointCloudT::Ptr> outputClusters;
+	regionGrow(inputTmp, 30, 2, 2, 30, 10, outputClusters);
+
+	vector<PointCloudT::Ptr> possibleBeamPlanes;
+	vector<Eigen::Vector4f> possibleBeamPlanesCoff;
+	for (auto& cluster: outputClusters) {
+		pcl::ModelCoefficients::Ptr sacCoefficients(new pcl::ModelCoefficients);
+		pcl::PointIndices::Ptr sacInliers(new pcl::PointIndices);
+		pcl::SACSegmentation<PointT> seg;
+		seg.setOptimizeCoefficients(true);
+		seg.setModelType(pcl::SACMODEL_PLANE);
+		seg.setMethodType(pcl::SAC_RANSAC);
+		seg.setDistanceThreshold(0.05);
+		seg.setInputCloud(cluster);
+		seg.segment(*sacInliers, *sacCoefficients);
+		Eigen::Vector4f  coff;
+		coff << sacCoefficients->values[0], sacCoefficients->values[1], sacCoefficients->values[2], sacCoefficients->values[3];
+		// we only need to remain the planes which are very parallel with xy plane
+		if (abs(coff[0]) < 0.1 && abs(coff[1]) < 0.1){
+			possibleBeamPlanes.push_back(cluster);
+			possibleBeamPlanesCoff.push_back(coff);
+		}
+	}
+	cout << "[BeamRANSAC] " << possibleBeamPlanes.size() << " are found from " << outputClusters.size() << endl;
+
+	// next step, we want to construct lines around found points and check these lines up space whether contain pts
+	simpleView("[BeamRANSAC] possible Beam Planes", possibleBeamPlanes);
+
+	vector<PointCloudT::Ptr> tmp;
+	for (auto& plane: possibleBeamPlanes) {
+		PointCloudT::Ptr resTmp(new PointCloudT);
+		vector<PointT> edge = findEdgeForPlane(plane);
+		if (edge.size() == 0) continue;
+		generateLinePointCloud(edge[0],edge[1],100, INT32_MAX, resTmp);
+		generateLinePointCloud(edge[1],edge[2],100, INT32_MAX, resTmp);
+		generateLinePointCloud(edge[2],edge[3],100, INT32_MAX, resTmp);
+		generateLinePointCloud(edge[3],edge[0],100, INT32_MAX, resTmp);
+		tmp.push_back(resTmp);
+	}
+	for (auto& t : tmp) possibleBeamPlanes.push_back(t);
+
+	simpleView("[BeamRANSAC] possible Beam Planes with check boundary", possibleBeamPlanes);
+
+
+}
+
+vector<PointT> findEdgeForPlane(PointCloudT::Ptr input){
+
+	pcl::ModelCoefficients::Ptr sacCoefficients(new pcl::ModelCoefficients);
+	pcl::PointIndices::Ptr sacInliers(new pcl::PointIndices);
+	pcl::SACSegmentation<PointT> seg;
+	seg.setOptimizeCoefficients(true);
+	seg.setModelType(pcl::SACMODEL_LINE);
+	seg.setMethodType(pcl::SAC_RANSAC);
+	seg.setDistanceThreshold(Paras<float>("BeamRecons","RANSACDistTh"));
+	seg.setInputCloud(input);
+	seg.segment(*sacInliers, *sacCoefficients);
+	Eigen::VectorXf coff(6);
+	coff << sacCoefficients->values[0], sacCoefficients->values[1], sacCoefficients->values[2],
+			sacCoefficients->values[3], sacCoefficients->values[4], sacCoefficients->values[5];
+
+	//cout << coff[3]<< " " << coff[4] << " " << coff[5]<< " " <<endl;
+	PointCloudT::Ptr transformed(new PointCloudT);
+	Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
+	float theta = acos(abs(coff[4]) / sqrt(coff[3]*coff[3] + coff[4]*coff[4] + coff[5]*coff[5]));
+	if (coff[3]*coff[4] < 0) theta = -theta;
+	cout << theta*180/M_PI << endl;
+	transform(0,0) = cos(theta); transform(0,1) = -sin(theta); transform(1,0) = sin(theta); transform(1,1) = cos(theta);
+	transformPointCloud(*input, *transformed, transform);
+	//simpleView("[findEdgeForPlane] transformed pts", transformed);
+
+	// calculate edge : transform so it can be parallel with x or y axis
+	PointT minP, maxP, p1, p2, p3, p4;
+	getMinMax3D(*transformed, minP, maxP);
+	p1.x = minP.x; p1.y = minP.y; p1.z = maxP.z;
+	p2.x = minP.x; p2.y = maxP.y; p2.z = maxP.z;
+	p3.x = maxP.x; p3.y = maxP.y; p3.z = maxP.z;
+	p4.x = maxP.x; p4.y = minP.y; p4.z = maxP.z;
+
+	// reverse
+	Eigen::Affine3f reverseT = Eigen::Affine3f::Identity();
+	reverseT.rotate(Eigen::AngleAxisf(-theta,Eigen::Vector3f::UnitZ()));
+	p1 = transformPoint(p1,reverseT);
+	p2 = transformPoint(p2,reverseT);
+	p3 = transformPoint(p3,reverseT);
+	p4 = transformPoint(p4,reverseT);
+
+	generateLinePointCloud(p1,p2,100, INT32_MAX, transformed);
+	generateLinePointCloud(p2,p3,100, INT32_MAX, transformed);
+	generateLinePointCloud(p3,p4,100, INT32_MAX, transformed);
+	generateLinePointCloud(p4,p1,100, INT32_MAX, transformed);
+	//simpleView("test", transformed);
+
+	return vector<PointT>{p1,p2,p3,p4};
+
+}

@@ -6,3 +6,5 @@ test
 .vs
 .idea/
 cmake-build-debug/
+config.yamldd
+

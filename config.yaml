@@ -27,13 +27,14 @@ SmoothNoise:
   beta : 3
 
 View:
-  original : true
+  original : false
   smoothNoise : false
   densityFilter : false
   2D : false
   BiggestComponent : false
   hull : false
-  linkedEdges : true
+  extractLine: false
+  linkedEdges : false
 
 
 DensityFilter:
@@ -47,3 +48,8 @@ ComputeHull:
 RegionGrow2D:
   serarchRadius : 0.3
   normalTh : 5
+
+BeamRecons:
+  isExist : true
+  RANSACDistTh : 1
+
