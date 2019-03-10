@@ -27,14 +27,14 @@ SmoothNoise:
   beta : 3
 
 View:
-  original : false
-  smoothNoise : false
-  densityFilter : false
-  2D : false
+  original         : false
+  smoothNoise      : false
+  densityFilter    : false
+  2D               : false
   BiggestComponent : false
-  hull : false
-  extractLine: false
-  linkedEdges : false
+  hull             : false
+  extractLine      : false
+  linkedEdges      : true
 
 
 DensityFilter:

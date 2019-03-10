@@ -33,6 +33,7 @@
 #include "Plane.h"
 #include "SimpleView.h"
 #include "Reconstruction.h"
+#include "DxfExporter.h"
 #include <pcl/surface/concave_hull.h>
 #include <pcl/surface/convex_hull.h>
 #include <yaml-cpp/yaml.h>
@@ -80,34 +81,6 @@ int32_t randomColor() {
 //	int roof_CurvatureThreshold = 1;
 //	int roof_MinSizeOfCluster = 1;
 //}paras;
-
-// color
-PlaneColor commonPlaneColor = Color_White;
-PlaneColor outerPlaneColor = Color_Yellow;
-PlaneColor innerPlaneColor = Color_Blue;
-PlaneColor upDownPlaneColor = Color_Green;
-void
-compute (pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_in,
-         bool convex_concave_hull,
-         float alpha,
-         pcl::PointCloud<pcl::PointXYZ>::Ptr &mesh_out)
-{
-    if (!convex_concave_hull)
-    {
-        pcl::console::print_info ("Computing the convex hull of a cloud with %lu points.\n", cloud_in->size ());
-        pcl::ConvexHull<pcl::PointXYZ> convex_hull;
-        convex_hull.setInputCloud (cloud_in);
-        convex_hull.reconstruct (*mesh_out);
-    }
-    else
-    {
-        pcl::console::print_info ("Computing the concave hull (alpha shapes) with alpha %f of a cloud with %lu points.\n", alpha, cloud_in->size ());
-        pcl::ConcaveHull<pcl::PointXYZ> concave_hull;
-        concave_hull.setInputCloud (cloud_in);
-        concave_hull.setAlpha (alpha);
-        concave_hull.reconstruct (*mesh_out);
-    }
-}
 
 YAML::Node config ;
 
@@ -260,6 +233,7 @@ int main(int argc, char** argv) {
 	cout << "after find linked lines, extract " << edgeLines.size() << " lines\n";
 	if (Paras<bool>("View","linkedEdges")) simpleView("line pts after findLinkedLines" , edgeLines2);
 
+	exportToDxf("./output.dxf", edgeLines2, heightLow, heightHigh);
     return 0;
 /*    PointT min, max;
     pcl::getMinMax3D(*topTemp,min,max);
@@ -1422,4 +1396,20 @@ vector<PointT> findEdgeForPlane(PointCloudT::Ptr input){
 
 	return vector<PointT>{p1,p2,p3,p4};
 
+}
+
+void exportToDxf(string outputPath, vector<EdgeLine>& lines, float minZ, float maxZ){
+    KKRecons::DxfExporter exporter;
+
+    for (auto& line: lines) {
+        PointXYZ a,b,c,d;
+        a.x = line.p.x; a.y = line.p.y; a.z = minZ;
+        b.x = line.q.x; b.y = line.q.y; b.z = minZ;
+        c.x = line.q.x; c.y = line.q.y; c.z = maxZ;
+        d.x = line.p.x; d.y = line.p.y; d.z = maxZ;
+        DxfFace face(a,b,c,d);
+        exporter.insert(face);
+        break;
+    }
+    exporter.exportDXF(outputPath);
 }
