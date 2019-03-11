@@ -44,35 +44,6 @@ using namespace pcl;
 typedef pcl::PointXYZRGB PointRGB;
 typedef pcl::PointXYZRGBNormal PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
-//struct reconstructParas
-//{
-//	// Downsampling
-//	int KSearch = 10;
-//	float leafSize = 0.05; // unit is meter -> 5cm
-//
-//	// Clustering
-//	int MinSizeOfCluster = 800;
-//	int NumberOfNeighbours = 30;
-//	int SmoothnessThreshold = 5; // angle 360 degree
-//	int CurvatureThreshold = 10;
-//	// RANSAC
-//	double RANSAC_DistThreshold = 0.25; //0.25;
-//	float RANSAC_MinInliers = 0.5; // 500 todo: should be changed to percents
-//	float RANSAC_PlaneVectorThreshold = 0.2;
-//
-//	// Fill the plane
-//	int pointPitch = 20; // number of point in 1 meter
-//
-//	// Combine planes
-//	int minimumEdgeDist = 1; //we control the distance between two edges and the height difference between two edges
-//	float minHeightDiff = 0.5;
-//	int minAngle_normalDiff = 5;// when extend smaller plane to bigger plane, we will calculate the angle between normals of planes
-//
-//	int roof_NumberOfNeighbours = 1;
-//	int roof_SmoothnessThreshold = 2;
-//	int roof_CurvatureThreshold = 1;
-//	int roof_MinSizeOfCluster = 1;
-//}paras;
 
 YAML::Node config ;
 
@@ -88,7 +59,6 @@ T Paras(string a, string b)
     YAML::Node aa = config[a];
     return aa[b].as<T>();
 }
-
 
 int main(int argc, char** argv) {
 
@@ -484,7 +454,6 @@ int main(int argc, char** argv) {
 }
 
 
-
 void generateLinePointCloud(PointT pt1, PointT pt2, int pointPitch, int color, PointCloudT::Ptr output) {
 	int numPoints = pcl::geometry::distance(pt1, pt2) * pointPitch;
 	float ratioX = (pt1.x - pt2.x) / numPoints;
@@ -551,7 +520,6 @@ void extendSmallPlaneToBigPlane(Plane& sourceP, Plane& targetP, int color, int p
 }
 
 // fixme: these insect are baed on 2 dimention - fix them in 3d dimention
-
 bool onSegment(PointT p, PointT q, PointT r)
 {
 	// Given three colinear points p, q, r, the function checks if
