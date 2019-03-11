@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
             else if (index == 2) fileName = "/home/czh/Desktop/PointCloudDataset/LaserScanner/roomE_empty/roomE_empty.ply";
             else if (index == 3) fileName = "/home/czh/Desktop/PointCloudDataset/LaserScanner/cooridor/Downsampled_coorridor_all.ply";
         }
-    #endifsmall
+    #endif
     config = YAML::LoadFile(configPath);
 	Reconstruction re(fileName);
 	if (Paras<bool>("View","original")) simpleView("input original point clouds", re.pointCloud);
