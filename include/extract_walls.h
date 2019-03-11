@@ -61,10 +61,21 @@ struct EdgeLine{
     PointT p;
     PointT q;
 };
+
+struct Colors{
+    const int32_t Red    = 255 <<24 | 255 << 16 | 0   << 8 | 0;
+    const int32_t Yellow = 255 <<24 | 255 << 16 | 255 << 8 | 0;
+    const int32_t Blue   = 255 <<24 | 0   << 16 | 0   << 8 | 255;
+    const int32_t Green  = 255 <<24 | 0   << 16 | 255 << 8 | 0;
+    const int32_t Cyan   = 255 <<24 | 0   << 16 | 255 << 8 | 255;
+    const int32_t Pink   = 255 <<24 | 255 << 16 | 0   << 8 | 255;
+    const int32_t White  = INT32_MAX;
+}Colors;
 typedef pcl::PointXYZRGBNormal PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
 
 void generateLinePointCloud(PointT pt1, PointT pt2, int pointPitch, int color, PointCloudT::Ptr output);
+void generateLinePointCloud(PointT a, PointT b, PointT c, PointT d, int pointPitch, int color, PointCloudT::Ptr output);
 
 // mark: for debug reason
 void extendSmallPlaneToBigPlane(Plane& sourceP, Plane& targetP, int color, int pointPitch, PointCloudT::Ptr output);
@@ -100,4 +111,10 @@ void removePtsAroundLine(PointCloudT::Ptr input, PointCloudT::Ptr output, vector
 void regionGrow2D(PointCloudT::Ptr input, vector<PointCloudT::Ptr>& output);
 void calculateNormal2D(PointCloudT::Ptr input, PointCloud<Normal>::Ptr cloud_normals);
 
+void BeamRANSAC(PointCloudT::Ptr input, float high);
+vector<PointT> findEdgeForPlane(PointCloudT::Ptr input, float maxRoomZ, PointCloudT::Ptr roofPart);
+
+void exportToDxf(string outputPath, vector<EdgeLine>& lines, float minZ, float maxZ);
+
+int checkNumofPointofLineinZ(PointT p, PointT q, PointCloudT::Ptr input, float minZ, float maxZ, PointCloudT::Ptr debug_cube);
 #endif //TEST_PCL_EXTRACTWALL_H

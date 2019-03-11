@@ -45,26 +45,22 @@ if(UNIX AND NOT APPLE)
           src/Plane.cpp
           src/SimpleView.cpp
           src/Reconstruction.cpp
-          src/SimpleView.cpp)
+          src/SimpleView.cpp
+          src/DxfExporter.cpp)
 
   # eigen
   include_directories( "/usr/include/eigen3/" )
+
   # pcl
   find_package( PCL 1.8 REQUIRED )
   include_directories( ${PCL_INCLUDE_DIRS} )
-
   link_directories(${PCL_LIBRARY_DIRS})
   add_definitions( ${PCL_DEFINITIONS} )
-
-  target_link_libraries(${PROJECT_NAME}
-          ${PCL_LIBRARIES})
+  target_link_libraries(${PROJECT_NAME} ${PCL_LIBRARIES})
 
   #YAML
   find_package(  yaml-cpp REQUIRED )
   target_link_libraries(${PROJECT_NAME} ${YAML_CPP_LIBRARIES})
-
-  add_executable(extractWall extract_walls.cpp)
-  target_link_libraries (extractWall ${PROJECT_NAME})
 
   # CGAL and its components
   find_package( CGAL )
@@ -74,6 +70,9 @@ if(UNIX AND NOT APPLE)
   else()
     message(STATUS "NOTICE: This program requires the CGAL library, and will not be compiled.")
   endif()
+
+  add_executable(extractWall extract_walls.cpp)
+  target_link_libraries (extractWall ${PROJECT_NAME})
 
   add_executable(testCGAL testCGAL.cpp)
   target_link_libraries(testCGAL ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES})

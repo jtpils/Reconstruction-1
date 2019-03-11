@@ -27,13 +27,16 @@ SmoothNoise:
   beta : 3
 
 View:
-  original : true
-  smoothNoise : false
-  densityFilter : false
-  2D : false
+  original         : true
+  smoothNoise      : false
+  densityFilter    : false
+  2D               : false
   BiggestComponent : false
-  hull : false
-  linkedEdges : true
+  hull             : false
+  extractLine      : false
+  linkedEdges      : true
+  BeamCube         : true
+  BeamCubeEach     : false
 
 
 DensityFilter:
@@ -47,3 +50,12 @@ ComputeHull:
 RegionGrow2D:
   serarchRadius : 0.3
   normalTh : 5
+
+BeamRecons:
+  isExist : false
+  RANSACDistTh : 1
+  # for the edge we found for on possible beam, we search its surrounding points along z axis
+  EdgeZDist : 0.1
+  # the num of points in the cube over the size of cube  (l*h / rho^2) / (2*d*l*h / rho^2) = 1/2 * d
+  cubeNumPtsRatio : 0.5
+
