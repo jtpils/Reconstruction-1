@@ -24,18 +24,18 @@ Combine:
 
 SmoothNoise:
   K : 50
-  beta : 3
+  alpha : 3
 
 View:
-  original         : true
+  original         : false
   smoothNoise      : false
   densityFilter    : false
   2D               : false
   BiggestComponent : false
   hull             : false
   extractLine      : false
-  linkedEdges      : true
-  BeamCube         : true
+  linkedEdges      : false
+  BeamCube         : false
   BeamCubeEach     : false
 
 
@@ -53,6 +53,7 @@ RegionGrow2D:
 
 BeamRecons:
   isExist : true
+  possibleHeight : 0.5
   RANSACDistTh : 1
   # for the edge we found for on possible beam, we search its surrounding points along z axis
   EdgeZDist : 0.1

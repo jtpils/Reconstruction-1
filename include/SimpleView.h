@@ -5,7 +5,7 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <Plane.h>
 #include <Reconstruction.h>
-#include <extract_walls.h>
+#include <main.h>
 using namespace std;
 typedef pcl::PointXYZRGBNormal PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;

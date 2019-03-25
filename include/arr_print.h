@@ -1,5 +1,10 @@
 #ifndef _PRINT_ARR_H_
 #define _PRINT_ARR_H_
+
+#include "DebugFileExporter.h"
+
+
+
 //-----------------------------------------------------------------------------
 // Print all neighboring vertices to a given arrangement vertex.
 //
@@ -34,21 +39,25 @@ void print_ccb (typename Arrangement::Ccb_halfedge_const_circulator circ)
 {
     typename Arrangement::Ccb_halfedge_const_circulator  curr = circ;
     typename Arrangement::Halfedge_const_handle          he;
-    std::cout << "(" << curr->source()->point() << ")";
+    string ss = to_string(CGAL::to_double(curr->source()->point().x())) + " " + to_string(CGAL::to_double(curr->source()->point().y())) + " ";
     do
     {
         he = curr;
-        std::cout << "   [" << he->curve() << "]   "
-                  << "(" << he->target()->point() << ")";
+        //std::cout << "   [" << he->curve() << "]   "
+        //          << "(" << he->target()->point() << ")";
+        ss = ss + to_string(CGAL::to_double(he->target()->point().x())) + " " + to_string(CGAL::to_double(he->target()->point().y())) + " ";
+
         ++curr;
     } while (curr != circ);
-    std::cout << std::endl;
+    facesOutput.insertLine(ss);
+    //cout << endl;
+    //cout << ss << endl;
     return;
 }
 //-----------------------------------------------------------------------------
 // Print the boundary description of an arrangement face.
 //
-template<class Arrangement>
+/*template<class Arrangement>
 void print_face (typename Arrangement::Face_const_handle f)
 {
     // Print the outer boundary.
@@ -60,6 +69,8 @@ void print_face (typename Arrangement::Face_const_handle f)
     {
         std::cout << "Outer boundary: ";
         print_ccb<Arrangement> (f->outer_ccb());
+
+
     }
     // Print the boundary of each of the holes.
     typename Arrangement::Hole_const_iterator  hole;
@@ -67,7 +78,7 @@ void print_face (typename Arrangement::Face_const_handle f)
     for (hole = f->holes_begin(); hole != f->holes_end(); ++hole, ++index)
     {
         std::cout << "    Hole #" << index << ": ";
-        print_ccb<Arrangement> (*hole);
+        //print_ccb<Arrangement> (*hole);
     }
     // Print the isolated vertices.
     typename Arrangement::Isolated_vertex_const_iterator  iv;
@@ -77,12 +88,13 @@ void print_face (typename Arrangement::Face_const_handle f)
         std::cout << "    Isolated vertex #" << index << ": "
                   << "(" << iv->point() << ")" << std::endl;
     }
+
     return;
-}
+}*/
 //-----------------------------------------------------------------------------
 // Print the given arrangement.
 //
-template<class Arrangement>
+/*template<class Arrangement>
 void print_arrangement (const Arrangement& arr)
 {
     CGAL_precondition (arr.is_valid());
@@ -108,5 +120,75 @@ void print_arrangement (const Arrangement& arr)
     for (fit = arr.faces_begin(); fit != arr.faces_end(); ++fit)
         print_face<Arrangement> (fit);
     return;
+}*/
+
+template<class Arrangement>
+void print_arrangement_face (const Arrangement& arr)
+{
+    CGAL_precondition (arr.is_valid());
+    // Print the arrangement faces.
+    typename Arrangement::Face_const_iterator    fit;
+    std::cout << arr.number_of_faces() << " faces:" << std::endl;
+    for (fit = arr.faces_begin(); fit != arr.faces_end(); ++fit) {
+        if (fit->is_unbounded())
+        {
+            std::cout << "Unbounded face. " << std::endl;
+        }
+        else
+        {
+            std::cout << "Outer: ";
+            print_ccb<Arrangement> (fit->outer_ccb());
+        }
+        // Print the boundary of each of the holes.
+        typename Arrangement::Hole_const_iterator  hole;
+        int                                         index = 1;
+        for (hole = fit->holes_begin(); hole != fit->holes_end(); ++hole, ++index)
+        {
+            std::cout << "    Hole #" << index << ": ";
+            //print_ccb<Arrangement> (*hole);
+        }
+        // Print the isolated vertices.
+        typename Arrangement::Isolated_vertex_const_iterator  iv;
+        for (iv = fit->isolated_vertices_begin(), index = 1;
+             iv != fit->isolated_vertices_end(); ++iv, ++index)
+        {
+            std::cout << "    Isolated vertex #" << index << ": "
+                      << "(" << iv->point() << ")" << std::endl;
+        }
+
+    }
+    facesOutput.exportToPath();
+    return;
 }
+
+
+template<class Arrangement>
+void printVertex(const Arrangement& arr){
+    CGAL_precondition (arr.is_valid());
+    // Print the arrangement vertices.
+    typename Arrangement::Vertex_const_iterator  vit;
+    std::cout << arr.number_of_vertices() << " vertices:" << std::endl;
+    for (vit = arr.vertices_begin(); vit != arr.vertices_end(); ++vit)
+    {
+        std::cout << "(" << vit->point() << ")";
+        if (vit->is_isolated())
+            std::cout << " - Isolated." << std::endl;
+        else
+            std::cout << " - degree " << vit->degree() << std::endl;
+    }
+    for (vit = arr.vertices_begin(); vit != arr.vertices_end(); ++vit)
+    {
+//        Traits_2::Point_2 point = vit->point();
+//        double x = CGAL::to_double(point.x());
+//        double y = CGAL::to_double(point.y());
+//        string ss;
+//        ss = to_string(x) + " " + to_string(y);
+//        CGALOutput.insertLine(ss);
+//		if (vit->is_isolated())
+//			std::cout << " - Isolated." << std::endl;
+//		else
+//			std::cout << " - degree " << vit->degree() << std::endl;
+    }
+}
+
 #endif
